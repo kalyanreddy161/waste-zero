@@ -1,0 +1,157 @@
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f8;
+}
+
+/* CENTER */
+.page-center {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* CARD */
+.auth-card {
+  width: 540px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+/* TABS */
+.tab-header {
+  display: flex;
+  background: #f9fafb;
+}
+
+.tab-header button {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.tab-header button.active {
+  background: #fff;
+  border-bottom: 2px solid #2563eb;
+  color: #2563eb;
+}
+
+/* FIXED HEIGHT */
+.form-wrapper {
+  height: 560px;
+  overflow: hidden;
+}
+
+/* SLIDER */
+.form-slider {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transition: transform 0.5s ease;
+}
+
+.form-slider.login {
+  transform: translateX(0%);
+}
+
+.form-slider.register {
+  transform: translateX(-50%);
+}
+
+/* PANEL */
+.form-panel {
+  width: 50%;
+  padding: 30px;
+}
+
+.form-panel p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+/* ===== FLOATING INPUT (FINAL & CORRECT) ===== */
+
+.input-container {
+  position: relative;
+  margin-bottom: 22px;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px 4px;
+  font-size: 15px;
+  border: none;
+  border-bottom: 2px solid #d1d5db;
+  outline: none;
+  background: transparent;
+}
+
+/* LABEL hidden initially */
+.input-label {
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  font-size: 14px;
+  color: #2563eb;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0);
+  transition: all 0.3s ease;
+}
+
+/* underline */
+.input-highlight {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: #2563eb;
+  transition: 0.3s ease;
+}
+
+/* 🔥 KEY FIX */
+/* show label on focus OR when input has value */
+.input-field:focus + .input-label,
+.input-field:not(:placeholder-shown) + .input-label {
+  opacity: 1;
+  transform: translateY(-20px);
+  font-size: 12px;
+}
+
+/* underline animation */
+.input-field:focus + .input-label + .input-highlight {
+  width: 100%;
+}
+
+/* SHOW PASSWORD */
+.show-password {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  margin: 6px 0 14px;
+}
+
+.show-password input {
+  cursor: pointer;
+}
+
+.error-text {
+  color: red;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
