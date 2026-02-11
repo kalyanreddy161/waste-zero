@@ -17,10 +17,10 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
 
-// 🔐 Protected route example
-router.get("/dashboard", checkAuth, (req, res) => {
+// 🔐 Protected route example (renamed to /home)
+router.get("/home", checkAuth, (req, res) => {
   res.status(200).json({
-    message: "Welcome to dashboard",
+    message: "Welcome to home",
     user: req.session.user
   });
 });

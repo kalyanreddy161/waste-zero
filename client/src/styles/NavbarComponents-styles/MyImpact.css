@@ -1,0 +1,6 @@
+@import './Dashboard.css';
+
+.grid { grid-template-columns: repeat(3, 1fr); }
+.page{padding:20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(8,193,138,0.06)}

@@ -71,12 +71,20 @@ exports.register = async (req, res) => {
     }
 
     const user = new User(userData);
-    req.session.user = {user : user.username}
-    req.session.isAuthenticated = true;
-
     await user.save();
 
-    res.status(201).json({ message: "User registered successfully" });
+    const userObj = {
+      id: user._id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      username: user.username,
+      role: user.role
+    };
+
+    req.session.user = userObj;
+    req.session.isAuthenticated = true;
+
+    res.status(201).json({ message: "User registered successfully", user: userObj });
   } catch (error) {
     console.error("Register error:", error);
     res.status(500).json({ message: error.message });
@@ -101,11 +109,20 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    req.session.user = {user : user.username};
+    const userObj = {
+      id: user._id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      username: user.username,
+      role: user.role
+    };
+
+    req.session.user = userObj;
     req.session.isAuthenticated = true;
+
     res.json({
       message: "Login successful",
-      user: req.session.user
+      user: userObj
     });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
