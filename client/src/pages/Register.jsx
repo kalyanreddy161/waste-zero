@@ -1,11 +1,14 @@
-import { useEffect, useState} from "react";
+import { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/Register.css";
+import { UserContext } from "../Services/UserContext";
+import Loading from "../components/Loading";
 
 const API = "http://localhost:3000/auth";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { setUser } = useContext(UserContext);
 
 
     /* ======================
@@ -14,13 +17,15 @@ export default function Register() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const res = await fetch(`${API}/dashboard`, {
+        const res = await fetch(`${API}/home`, {
           credentials: "include",
         });
 
-        if (res.ok) {
-          navigate("/dashboard");
-        }
+            if (res.ok) {
+              const data = await res.json();
+              if (data.user) setUser(data.user);
+              navigate("/home");
+            }
       } catch (err) {
         // stay on login page
       }
@@ -31,6 +36,8 @@ export default function Register() {
 
   const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
+  const [Password, setPassword] = useState('');
+  const [ConfirmPassword, setConfirmPassword] = useState('');
 
   /* ======================
      REGISTER STATE
@@ -46,6 +53,9 @@ export default function Register() {
 
   const [emailExists, setEmailExists] = useState(false);
   const [usernameExists, setUsernameExists] = useState(false);
+  const [registerWarning, setRegisterWarning] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
 
   /* ======================
      LOGIN STATE
@@ -62,6 +72,7 @@ export default function Register() {
   ====================== */
   const handleRegisterChange = (e) => {
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
+    setRegisterWarning("");
   };
 
   const handleLoginChange = (e) => {
@@ -69,7 +80,7 @@ export default function Register() {
   };
 
   /* ======================
-     CHECK EMAIL (3s)
+     CHECK EMAIL (1s)
   ====================== */
   useEffect(() => {
     if (!registerData.email) return;
@@ -111,9 +122,21 @@ export default function Register() {
   ====================== */
   const handleRegister = async (e) => {
     e.preventDefault();
+    setLoginError("");
+  
+
+    // validate required fields (exclude the show-password checkbox)
+    const { fullName, email, username, password, confirmPassword, role } = registerData;
+    if (!fullName || !email || !username || !password || !confirmPassword || !role) {
+      setRegisterWarning("Please fill in all required fields.");
+      return;
+    }
 
     if (emailExists || usernameExists) return;
-    if (registerData.password !== registerData.confirmPassword) return;
+    if (registerData.password !== registerData.confirmPassword) {
+      setRegisterWarning("Passwords do not match.");
+      return;
+    }
 
     const res = await fetch(`${API}/register`, {
       method: "POST",
@@ -129,7 +152,9 @@ export default function Register() {
     });
 
     if (res.ok) {
-      navigate("/dashboard");
+      const data = await res.json();
+      if (data.user) setUser(data.user);
+      navigate("/home");
     }
   };
 
@@ -139,6 +164,7 @@ export default function Register() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
+ 
 
     const res = await fetch(`${API}/login`, {
       method: "POST",
@@ -152,13 +178,54 @@ export default function Register() {
     if (!res.ok) {
       setLoginError(data.message || "Invalid credentials");
     } else {
-      navigate("/dashboard");
+      if (data.user) setUser(data.user);;
+      navigate("/home");
     }
   };
 
   return (
-    <div className="page-center">
-      <div className="auth-card">
+    <>
+    <Loading isLoading={isLoading} />
+      <div className="register-container">
+        <div className="register-left">
+          <div className="register-logo">
+            <lord-icon
+            src="https://cdn.lordicon.com/zruuduya.json"
+            trigger="hover"
+            colors="primary:#121331,secondary:#ffffff"
+            style={{ width: "50px", height: "50px" }}
+          ></lord-icon>
+            <span> WasteZero</span>
+          </div>
+
+          <h1 className="register-heading">Join the Recycling Revolution</h1>
+
+          <p className="register-description">
+            WasteZero connects volunteers, NGOs, and administrators to schedule
+            pickups, manage recycling opportunities, and make a positive impact
+            on our environment.
+          </p>
+
+          <div className="register-features">
+        <div>
+          <h4>Schedule Pickups</h4>
+          <p>Easily arrange waste collection</p>
+        </div>
+
+        <div>
+          <h4>Track Impact</h4>
+          <p>Monitor your environmental contribution</p>
+        </div>
+
+        <div>
+          <h4>Volunteer</h4>
+          <p>Join recycling initiatives</p>
+        </div>
+      </div>
+        </div>
+
+        <div className="register-right page-center">
+          <div className="auth-card">
 
         {/* Tabs */}
         <div className="tab-header">
@@ -323,6 +390,12 @@ export default function Register() {
                 </select>
               </div>
 
+              {registerWarning && (
+                <p style={{ color: "red", fontSize: "0.95rem", marginTop: 8 }}>
+                  {registerWarning}
+                </p>
+              )}
+
               <button className="primary-btn" type="submit">
                 Create Account
               </button>
@@ -330,7 +403,9 @@ export default function Register() {
 
           </div>
         </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

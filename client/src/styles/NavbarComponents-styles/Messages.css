@@ -1,0 +1,7 @@
+@import './Dashboard.css';
+
+.page input { width: 100%; padding: 8px; margin-top: 8px; }
+.card p { margin: 6px 0; }
+.page{padding:20px}
+.card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(8,193,138,0.06)}
+input{width:100%;padding:8px;border:1px solid #e6f0ec;border-radius:6px}
