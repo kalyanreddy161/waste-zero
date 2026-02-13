@@ -1,4 +1,16 @@
+import React, { useEffect } from "react";
+
 export default function Loading({ isLoading }) {
+  useEffect(() => {
+    const scriptSrc = "https://cdn.lordicon.com/lordicon.js";
+    if (!document.querySelector(`script[src="${scriptSrc}"]`)) {
+      const s = document.createElement("script");
+      s.src = scriptSrc;
+      s.async = true;
+      document.body.appendChild(s);
+    }
+  }, []);
+
   if (!isLoading) return null;
 
   const overlayStyle = {
@@ -7,7 +19,7 @@ export default function Loading({ isLoading }) {
     left: 0,
     width: "100%",
     height: "100%",
-    background: "rgba(0, 0, 0, 0.4)",
+    background: "rgba(0, 0, 0, 0.45)",
     backdropFilter: "blur(4px)",
     display: "flex",
     justifyContent: "center",
@@ -16,20 +28,23 @@ export default function Loading({ isLoading }) {
   };
 
   const boxStyle = {
-    background: "white",
-    padding: "30px",
+    background: "transparent",
+    padding: "8px",
     borderRadius: "12px",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 
   return (
-    <div style={overlayStyle}>
+    <div style={overlayStyle} aria-hidden={!isLoading}>
       <div style={boxStyle}>
         <lord-icon
-          src="https://cdn.lordicon.com/xjovhxra.json"
+          src="https://cdn.lordicon.com/zruuduya.json"
           trigger="loop"
-          colors="primary:#08c18a"
-          style={{ width: "120px", height: "120px" }}
+          state="loop-cycle"
+          colors="primary:#121331,secondary:#ffffff"
+          style={{ width: "180px", height: "180px" }}
         ></lord-icon>
       </div>
     </div>
