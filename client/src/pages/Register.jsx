@@ -2,7 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/Register.css";
 import { UserContext } from "../Services/UserContext";
-import Loading from "../components/Loading";
+import { useLoading } from "../Services/LoadingContext";
 
 const API = "http://localhost:3000/auth";
 
@@ -39,6 +39,15 @@ export default function Register() {
   const [Password, setPassword] = useState('');
   const [ConfirmPassword, setConfirmPassword] = useState('');
 
+  // live password match check
+  const [passwordsMatch, setPasswordsMatch] = useState(true);
+
+  // OTP states
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [pasteOTP, setPasteOTP] = useState("");
+  const [otpError, setOtpError] = useState("");
+
   /* ======================
      REGISTER STATE
   ====================== */
@@ -54,7 +63,7 @@ export default function Register() {
   const [emailExists, setEmailExists] = useState(false);
   const [usernameExists, setUsernameExists] = useState(false);
   const [registerWarning, setRegisterWarning] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { isLoading, setLoading, withLoading } = useLoading();
 
 
   /* ======================
@@ -117,13 +126,25 @@ export default function Register() {
     return () => clearTimeout(timer);
   }, [registerData.username]);
 
+  // live-check password vs confirmPassword and show inline error
+  useEffect(() => {
+    const { password, confirmPassword } = registerData;
+    if (!confirmPassword) {
+      setPasswordsMatch(true);
+      return;
+    }
+    setPasswordsMatch(password === confirmPassword);
+  }, [registerData.password, registerData.confirmPassword]);
+
   /* ======================
      REGISTER SUBMIT
   ====================== */
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
     setLoginError("");
-  
+    setRegisterWarning("");
+    console.log("handleRegister called", { registerData, otpVerified, emailExists, usernameExists });
 
     // validate required fields (exclude the show-password checkbox)
     const { fullName, email, username, password, confirmPassword, role } = registerData;
@@ -133,28 +154,126 @@ export default function Register() {
     }
 
     if (emailExists || usernameExists) return;
+    if (!otpVerified) {
+      setRegisterWarning("Please verify your email with OTP before registering.");
+      return;
+    }
     if (registerData.password !== registerData.confirmPassword) {
       setRegisterWarning("Passwords do not match.");
       return;
     }
 
-    const res = await fetch(`${API}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        fullName: registerData.fullName,
-        email: registerData.email,
-        username: registerData.username,
-        password: registerData.password,
-        role: registerData.role
-      })
-    });
+    let res;
+    try {
+      setLoading(true);
+      res = await fetch(`${API}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          fullName: registerData.fullName,
+          email: registerData.email,
+          username: registerData.username,
+          password: registerData.password,
+          role: registerData.role
+        })
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.user) setUser(data.user);
-      navigate("/home");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) setUser(data.user);
+        navigate("/home");
+        return;
+      }
+
+      // handle error response
+      const err = await res.json();
+      console.error("Register failed:", err);
+      setRegisterWarning(err.message || "Registration failed");
+    } catch (networkErr) {
+      console.error("Register network error:", networkErr);
+      setRegisterWarning(networkErr.message || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ======================
+     OTP SEND / VERIFY
+  ====================== */
+  const handleOtpButtonClick = async () => {
+    setOtpError("");
+
+    // Need an email to send OTP
+    if (!registerData.email) {
+      setOtpError("Please enter an email first.");
+      return;
+    }
+
+    // Block sending OTP if email already exists
+    if (emailExists) {
+      setOtpError("Email already exists");
+      return;
+    }
+
+    // SEND OTP
+    if (!otpSent) {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API}/send-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: registerData.email })
+        });
+
+        const data = await res.json();
+        setLoading(false);
+
+        if (!res.ok) {
+          setOtpError(data.message || "Failed to send OTP");
+          return;
+        }
+
+        setOtpSent(true);
+      } catch (err) {
+        setLoading(false);
+        setOtpError(err.message || "Failed to send OTP");
+      }
+
+      return;
+    }
+
+    // VERIFY OTP
+    if (otpSent) {
+      if (!pasteOTP) {
+        setOtpError("Please paste the OTP to verify.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const res = await fetch(`${API}/verify-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: registerData.email, otp: pasteOTP })
+        });
+
+        const data = await res.json();
+        setLoading(false);
+
+        if (!res.ok) {
+          setOtpError(data.message || "OTP verification failed");
+          setOtpVerified(false);
+          return;
+        }
+
+        setOtpVerified(true);
+        setOtpError("");
+      } catch (err) {
+        setLoading(false);
+        setOtpError(err.message || "OTP verification failed");
+        setOtpVerified(false);
+      }
     }
   };
 
@@ -165,27 +284,32 @@ export default function Register() {
     e.preventDefault();
     setLoginError("");
  
+    try {
+      setLoading(true);
+      const res = await fetch(`${API}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(loginData)
+      });
 
-    const res = await fetch(`${API}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(loginData)
-    });
+      const data = await res.json();
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      setLoginError(data.message || "Invalid credentials");
-    } else {
-      if (data.user) setUser(data.user);;
-      navigate("/home");
+      if (!res.ok) {
+        setLoginError(data.message || "Invalid credentials");
+      } else {
+        if (data.user) setUser(data.user);
+        navigate("/home");
+      }
+    } catch (err) {
+      setLoginError(err.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
-    <Loading isLoading={isLoading} />
       <div className="register-container">
         <div className="register-left">
           <div className="register-logo">
@@ -286,7 +410,7 @@ export default function Register() {
             </form>
 
             {/* REGISTER */}
-            <form className="form-panel" onSubmit={handleRegister}>
+            <form className="form-panel" onSubmit={handleRegister} noValidate>
               <h2>Create a new account</h2>
               <p>Fill in your details to join WasteZero</p>
 
@@ -366,6 +490,12 @@ export default function Register() {
                 </div>
               </div>
 
+              {!passwordsMatch && registerData.confirmPassword && (
+                <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
+                  Passwords do not match
+                </p>
+              )}
+
               {/* SHOW PASSWORD */}
               <div className="show-password">
                 <input
@@ -390,13 +520,82 @@ export default function Register() {
                 </select>
               </div>
 
+              {/* OTP: Get / Verify */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                <div className="input-container" style={{ flex: 7, minWidth: 0 }}>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    name="pasteOTP"
+                    placeholder="Paste OTP"
+                    className="input-field"
+                    value={pasteOTP}
+                    onChange={(e) => {
+                      setPasteOTP(e.target.value.replace(/[^0-9]/g, ""));
+                      setOtpError("");
+                    }}
+                    autoComplete="one-time-code"
+                  />
+                  <label className="input-label">Paste OTP</label>
+                  <span className="input-highlight"></span>
+                </div>
+
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={handleOtpButtonClick}
+                  style={{
+                    flex: 3,
+                    padding: "10px 12px",
+                    fontSize: "0.95rem",
+                    cursor: emailExists ? "not-allowed" : undefined,
+                    opacity: emailExists ? 0.6 : 1
+                  }}
+                  disabled={emailExists || isLoading}
+                  title={emailExists ? "Email already exists" : undefined}
+                >
+                  {otpSent ? "Verify OTP" : "Get OTP"}
+                </button>
+              </div>
+
+              {(otpError || emailExists) && (
+                <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
+                  {otpError || (emailExists ? "Email already exists" : "")}
+                </p>
+              )}
+
+              {otpVerified && (
+                <p style={{ color: "green", fontSize: "0.85rem", marginTop: 6 }}>
+                  OTP verified ✓
+                </p>
+              )}
+
               {registerWarning && (
                 <p style={{ color: "red", fontSize: "0.95rem", marginTop: 8 }}>
                   {registerWarning}
                 </p>
               )}
 
-              <button className="primary-btn" type="submit">
+              <button
+                className="primary-btn"
+                type="submit"
+                disabled={
+                  !otpVerified ||
+                  !registerData.fullName ||
+                  !registerData.email ||
+                  !registerData.username ||
+                  !registerData.password ||
+                  !registerData.confirmPassword ||
+                  !registerData.role ||
+                  emailExists ||
+                  usernameExists ||
+                  isLoading
+                }
+                title={
+                  otpVerified ? undefined : "Please verify OTP to create account"
+                }
+                style={{ cursor: otpVerified ? "pointer" : "not-allowed" }}
+              >
                 Create Account
               </button>
             </form>

@@ -6,13 +6,17 @@ const {
   login,
   logout,
   existUsername,
-  existEmail
+  existEmail,
+  sendOTP,
+  verifyOTP
 } = require("../controllers/RegisterController");
 
 const checkAuth = require("../middlewares/CheckAuth");
 
 router.post("/exist-username", existUsername);
+router.post("/send-otp", sendOTP);
 router.post("/exist-email", existEmail);
+router.post("/verify-otp", verifyOTP);
 router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
