@@ -1,12 +1,7 @@
-process.on('uncaughtException', err => {
-  console.error("UNCAUGHT EXCEPTION:", err);
-});
-
-process.on('unhandledRejection', err => {
-  console.error("UNHANDLED PROMISE REJECTION:", err);
-});
 const express = require("express");
 const mongoose = require("mongoose");
+const session = require("express-session");
+const MongoDBStore = require("connect-mongodb-session")(session);
 const cors = require("cors");
 require("dotenv").config();
 const authRoutes = require("./routes/RegisterRoutes");
@@ -28,24 +23,52 @@ app.use(
 );
 
 /* ======================
-   ROUTES
+   DATABASE
+====================== */
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB error:", err));
+
+/* ======================
+   SESSION STORE
+====================== */
+const store = new MongoDBStore({
+  uri: process.env.MONGO_URI,
+  collection: "mySession",
+});
+
+store.on("error", (error) => {
+  console.error("SESSION STORE ERROR:", error);
+});
+
+/* ======================
+   SESSION MIDDLEWARE  ✅ MUST BE BEFORE ROUTES
+====================== */
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "secret123",
+    resave: false,
+    saveUninitialized: false,
+    store: store,
+    cookie: {
+      httpOnly: true,
+      secure: false, // true only in HTTPS
+      sameSite: "lax",
+    },
+  })
+);
+
+/* ======================
+   ROUTES  ✅ NOW req.session EXISTS
 ====================== */
 app.use("/auth", authRoutes);
 app.use("/", profileRoutes);
 
 /* ======================
-   CONNECT DB & START SERVER
+   SERVER
 ====================== */
 const PORT = process.env.PORT || 3000;
-
-// Start server FIRST
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-// Then try MongoDB (optional for now)
-mongoose.connect(process.env.MONGO_URI, { family: 4 })
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error("MongoDB connection failed:", err));
-
-
