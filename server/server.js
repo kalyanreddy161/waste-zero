@@ -10,8 +10,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
 const authRoutes = require("./routes/RegisterRoutes");
-const pickupRoutes = require("./routes/pickupRoutes");
-
+const profileRoutes = require("./routes/ProfileRoutes");
 
 const app = express();
 
@@ -32,8 +31,7 @@ app.use(
    ROUTES
 ====================== */
 app.use("/auth", authRoutes);
-app.use("/api/pickups", pickupRoutes);
-
+app.use("/", profileRoutes);
 
 /* ======================
    CONNECT DB & START SERVER
