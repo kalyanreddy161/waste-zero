@@ -9,6 +9,7 @@ import profile from "../assets/icons/profile.svg";
 import settings from "../assets/icons/settings.svg";
 import logout from "../assets/icons/logout.svg";
 import searchIcon from "../assets/icons/search.svg";
+import NotificationBell from "./NotificationBell";
 
 export default function Topbar() {
   const { user, setUser } = useContext(UserContext);
@@ -36,7 +37,7 @@ export default function Topbar() {
       </div>
 
       <div className="topbar-right" ref={menuRef}>
-        <button className="icon-btn" aria-label="notifications">🔔</button>
+        <div className="icon-btn" aria-label="notifications"><NotificationBell /></div>
         <div className="user-circle" title={user?.fullName || "Guest"} onClick={() => setOpen(!open)}>{initial}</div>
 
         {open && (
