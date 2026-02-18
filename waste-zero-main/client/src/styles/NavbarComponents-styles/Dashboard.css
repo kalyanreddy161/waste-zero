@@ -1,0 +1,40 @@
+/* Shared baseline styles for pages under NavbarComponents-styles */
+.page {
+  padding: 20px;
+  flex: 1;
+  background: #f7f7f7;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+.card {
+  background: #fff;
+  padding: 16px;
+  border-radius: 6px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.05);
+}
+.primary {
+  background: #08C18A;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.section-title { margin-top: 18px; margin-bottom: 8px; }
+.recent-list { display: grid; gap: 8px; margin-top: 8px; }
+.recent-item { background: #fff; padding: 10px; border-radius: 6px; }
+
+/* Remove top spacing for page titles inside .page */
+.page h2 { padding-top: 0; margin-top: 0; }
+.page { padding: 24px; background: #fff; height: 100%; overflow-y: auto; }
+.card { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 6px 18px rgba(8,193,138,0.06); }
+.grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.primary { background: #08C18A; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; }
+
+.section-title { margin: 18px 0 12px; font-weight: 700; }
+.recent-list { display: flex; flex-direction: column; gap: 10px; }
+.recent-item { background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
