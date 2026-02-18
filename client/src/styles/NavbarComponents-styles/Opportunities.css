@@ -1,0 +1,8 @@
+@import './Dashboard.css';
+
+/* Opportunities specific styles */
+.grid { grid-template-columns: repeat(3, 1fr); }
+.page{padding:20px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.card{background:#fff;padding:16px;border-radius:8px;box-shadow:0 6px 18px rgba(8,193,138,0.06)}
+.primary{background:#08C18A;color:#fff;padding:8px 12px;border-radius:8px;border:none}

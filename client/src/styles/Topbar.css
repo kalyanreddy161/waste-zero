@@ -1,0 +1,75 @@
+/* Topbar base */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-wrap: nowrap;
+}
+
+.topbar-left { flex: 1; display: flex; align-items: center; min-width: 0; }
+.topbar-search {
+  width: 100%;
+  max-width: 680px;
+  padding: 10px 12px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Search wrapper to show icon inside input area */
+.topbar-search-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 680px; }
+.search-icon { width: 18px; height: 18px; opacity: 0.7; margin-left: 6px; }
+.topbar-search { padding-left: 8px; }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; margin-left: 12px; position: relative; flex: 0 0 auto; }
+.icon-btn { background: none; border: none; font-size: 18px; cursor: pointer; }
+.user-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #08C18A;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+/* Topbar menu popup */
+.topbar-menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  width: 250px;
+  max-width: 90vw;
+  height: 300px;
+  max-height: 80vh;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  border-radius: 8px;
+  overflow: auto;
+  z-index: 50;
+}
+.topbar-menu .menu-content { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.menu-name { font-weight: 700; font-size: 18px; color: #222; }
+.menu-item { padding: 10px 12px; text-align: left; border: none; background: #f5f5f5; border-radius: 6px; cursor: pointer; }
+.menu-item:hover { background: #eee; }
+.menu-logout { background: #ffecec; color: #b00020; }
+.menu-logout:hover { background: #ffd6d6; }
+
+/* Ensure icon + text are aligned in menu items */
+.menu-item { display: flex; align-items: center; gap: 12px; }
+.menu-icon { width: 20px; height: 20px; object-fit: contain; display: inline-block; }
+
+/* Small screen tweaks to keep popup within viewport */
+@media (max-width: 480px) {
+  .topbar-menu { right: 8px; left: 8px; width: auto; top: 48px; }
+  .menu-item { padding: 10px; }
+}
