@@ -1,0 +1,5 @@
+@import './Dashboard.css';
+
+.page input[type="checkbox"] { transform: scale(1.1); margin-left: 8px; }
+.page{padding:20px}
+.card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(8,193,138,0.06)}
