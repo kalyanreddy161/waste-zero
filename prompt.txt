@@ -1,0 +1,70 @@
+profile page backend check
+
+
+🎯 Goal:
+cross checking all these api are working like this or not 
+
+📦 Context:
+create backend apis{
+sendotpforupdateapi :{
+    body: userid, email
+    function: search the user by userid and send otpverification(we already defined in services use that) to body email and upadte the otp, expiry time of that userobject 
+    avoid: not change the user email that will change later
+},
+updateemail: {
+    body: userid, email
+    function: find the userid and change the email and make otp, expiry time to undifined
+}
+updateprofileapi: {
+    body : userid, fullname,skills, bio, location
+    function: find the userid and change the details
+},
+passwordapi:{
+    body: userid , password
+    function : find the user and change the password
+}
+}
+
+
+
+
+
+
+
+
+
+
+
+profile page ui and functionality
+
+
+
+🎯 Goal:
+add api call to front end to achive the functionality with the ui and add ui for profile.jsx 
+in format :
+top block profile, password toggle switch 
+below
+left block(appear on click profile switch){
+ui:
+first a normal static document showing user details with good alignment and spacing , text size
+in this block on top right put a edit button on click that edit button make below things are able to edit and seperate two section update email, update user personal details
+update email section:  input(type:email value: useremail always unable to edit), input(type : email placeholder : enter new email), get otp button , input(type:number) , verify and upadte button,
+functionality:
+on click edit button able to edit sepereting two sections
+    section1 functionality: user enter newemail, on click dend otp call sendotpforupdate(as body: present logged user id, entered new email) and make sendotp button = disable to avoid multiple fetch and freeze the new entered email to make unable to edit after sending otp and make enable otp input, verify & upadte button (until make it disable)
+                            user enter otp, onclick verify and update button call updateemail api and display the respone that sucess or failed 
+upadte user personal details section : personal info inputs(fullname , skills, bio , get location(it a function that fetches the current location)) exclude username , update profile button
+functionality : the inputs are filled with if the details are exist and able to modify on click update profile button call updateprofileapi and display the respone is sucess or failed 
+},
+right block(appear on click password switch){
+ui: 
+three inputs(current password, new password, confirm password), upadte password button 
+functionality: onclick update password button call updatepassword api to change the password and display the response is sucess of failed
+}, 
+add component : create a component messagebox this component is use to display the response whne is requried make sure use in this profile page ,
+style : mantain good styles , add animation(slidiing if possible)
+
+
+
+
+backend schedule and pick up

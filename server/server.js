@@ -5,6 +5,7 @@ const MongoDBStore = require("connect-mongodb-session")(session);
 const cors = require("cors");
 require("dotenv").config();
 const authRoutes = require("./routes/RegisterRoutes");
+const profileRoutes = require("./routes/ProfileRoutes");
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use(
    ROUTES  ✅ NOW req.session EXISTS
 ====================== */
 app.use("/auth", authRoutes);
+app.use("/", profileRoutes);
 
 /* ======================
    SERVER
