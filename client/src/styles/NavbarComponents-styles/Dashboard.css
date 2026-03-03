@@ -4,18 +4,21 @@
   flex: 1;
   background: #f7f7f7;
 }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-top: 12px;
 }
+
 .card {
   background: #fff;
   padding: 16px;
   border-radius: 6px;
-  box-shadow: 0 0 5px rgba(0,0,0,0.05);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
 }
+
 .primary {
   background: #08C18A;
   color: #fff;
@@ -24,17 +27,415 @@
   border-radius: 6px;
   cursor: pointer;
 }
-.section-title { margin-top: 18px; margin-bottom: 8px; }
-.recent-list { display: grid; gap: 8px; margin-top: 8px; }
-.recent-item { background: #fff; padding: 10px; border-radius: 6px; }
+
+.section-title {
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+.recent-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.recent-item {
+  background: #fff;
+  padding: 10px;
+  border-radius: 6px;
+}
 
 /* Remove top spacing for page titles inside .page */
-.page h2 { padding-top: 0; margin-top: 0; }
-.page { padding: 24px; background: #fff; height: 100%; overflow-y: auto; }
-.card { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 6px 18px rgba(8,193,138,0.06); }
-.grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-.primary { background: #08C18A; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; }
+.page h2 {
+  padding-top: 0;
+  margin-top: 0;
+}
 
-.section-title { margin: 18px 0 12px; font-weight: 700; }
-.recent-list { display: flex; flex-direction: column; gap: 10px; }
-.recent-item { background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+.page {
+  padding: 24px;
+  background: #fff;
+  /* internal scroll area: account for Topbar height (approx 80px) */
+  height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 6px 18px rgba(8, 193, 138, 0.06);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.primary {
+  background: #08C18A;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.section-title {
+  margin: 18px 0 12px;
+  font-weight: 700;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recent-item {
+  background: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+/* Dashboard opportunities carousel */
+.opp-carousel-wrapper {
+  position: relative;
+  margin-top: 12px;
+}
+
+.opp-carousel {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+  scroll-snap-type: x mandatory;
+  /* add horizontal padding so arrows don't cover card edges */
+  padding: 0 56px;
+}
+
+.opp-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.opp-carousel-track {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.opp-carousel-track {
+  /* hint to browser to promote track to its own layer for smoother transforms/scroll */
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.opp-carousel-card {
+  background: #fff;
+  border-radius: 8px;
+  /* shadow to reduce repaint cost during scroll */
+  box-shadow: 0 4px 10px rgba(8, 193, 138, 0.05);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scroll-snap-align: start;
+}
+
+.opp-carousel-track .opp-carousel-card {
+  min-width: calc((100% - 40px) / 3);
+  max-width: calc((100% - 40px) / 3);
+  flex: 0 0 calc((100% - 40px) / 3);
+}
+
+.opp-carousel-card {
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.opp-card-img-wrap-small img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.opp-card-img-placeholder-small {
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  background: #f2f2f2;
+}
+
+.opp-card-body-small {
+  padding: 16px;
+}
+
+.opp-card-title-small {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.opp-card-text-small {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Apply button inside carousel card */
+.opp-card-apply {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #08C18A;
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.opp-card-apply:hover {
+  filter: brightness(0.95);
+}
+
+.opp-carousel-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opp-arrow {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.opp-prev {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.opp-next {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.opp-arrow:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+@media (max-width: 1024px) {
+  .opp-carousel-card {
+    min-width: calc((100% - 30px) / 2);
+    max-width: calc((100% - 30px) / 2);
+    flex: 0 0 calc((100% - 30px) / 2);
+  }
+}
+
+@media (max-width: 600px) {
+  .opp-carousel-card {
+    min-width: 100%;
+    max-width: 100%;
+    flex: 0 0 100%;
+  }
+}
+
+/* Toggle Switch Styling */
+.switch {
+  --_switch-bg-clr: #EAFAF6;
+  --_switch-padding: 4px;
+  --_slider-bg-clr: #08B783;
+  --_slider-bg-clr-on: #08B783;
+  --_label-padding: 1rem 2rem;
+  --_switch-easing: cubic-bezier(0.47, 1.64, 0.41, 0.8);
+
+  width: fit-content;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 9999px;
+  cursor: pointer;
+  position: relative;
+  isolation: isolate;
+  margin: 20px 0;
+}
+
+/* Hide checkbox */
+.switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Labels */
+.switch>span {
+  display: grid;
+  place-content: center;
+  padding: var(--_label-padding);
+  transition: opacity 300ms ease-in-out 150ms;
+  color: black;
+  /* Default OFF text color */
+  z-index: 1;
+  font-weight: 600;
+}
+
+/* Slider */
+.switch::before,
+.switch::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+}
+
+.switch::before {
+  background-color: var(--_slider-bg-clr);
+  inset: var(--_switch-padding) 50% var(--_switch-padding) var(--_switch-padding);
+  transition:
+    inset 500ms var(--_switch-easing),
+    background-color 500ms ease-in-out;
+  z-index: 0;
+}
+
+/* Background */
+.switch::after {
+  background-color: var(--_switch-bg-clr);
+  inset: 0;
+  z-index: -1;
+}
+
+/* Checked state */
+.switch:has(input:checked)::before {
+  inset: var(--_switch-padding) var(--_switch-padding) var(--_switch-padding) 50%;
+  background-color: var(--_slider-bg-clr-on);
+}
+
+/* Active text color (inside slider) */
+.switch:has(input:not(:checked))>span:first-of-type,
+.switch:has(input:checked)>span:last-of-type {
+  color: white;
+}
+
+/* Opacity styling */
+.switch>span:last-of-type,
+.switch>input:checked+span:first-of-type {
+  opacity: 0.75;
+}
+
+.switch>input:checked~span:last-of-type {
+  opacity: 1;
+}
+
+/* Dashboard Stats Cards */
+.dashboard-stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #999;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive design for stats cards */
+@media (max-width: 768px) {
+  .dashboard-stats-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-number {
+    font-size: 24px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-stats-container {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .stat-number {
+    font-size: 22px;
+  }
+}

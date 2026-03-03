@@ -18,5 +18,6 @@ router.put("/profile/password", checkAuth, ProfileController.changePassword);
 // Get current user (sanitized)
 router.get("/me", checkAuth, ProfileController.getMe);
 
+
 module.exports = router;
 

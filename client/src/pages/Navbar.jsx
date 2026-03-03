@@ -1,7 +1,8 @@
-import React, { useEffect, useContext, useRef, useState, useLayoutEffect } from "react";
+import React, { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { UserContext } from "../Services/UserContext";
 import { useLoading } from "../Services/LoadingContext";
+import { useMe, API_BASE } from "../Services/useMe";
+import { useQueryClient } from "@tanstack/react-query";
 import "../styles/Navbar.css";
 
 // ✅ Import SVG icons
@@ -16,13 +17,14 @@ import logoutIcon from "../assets/icons/logout.svg";
 import helpIcon from "../assets/icons/help.svg";
 import adminIcon from "../assets/icons/admin.svg";
 
-const API = "http://localhost:3000/auth";
+const API = `${API_BASE}/auth`;
 
 const Navbar = ({ setActivePage }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, setUser } = useContext(UserContext);
   const { setLoading } = useLoading();
+  const { data: me } = useMe();
+  const queryClient = useQueryClient();
 
   // refs for each nav link so we can position the sliding indicator
   const linkRefs = useRef({});
@@ -33,7 +35,10 @@ const Navbar = ({ setActivePage }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch(`${API}/home`, { credentials: "include" });
+        const res = await fetch(`${API}/home`, {
+          credentials: "include",
+          cache: "no-store"
+        });
         if (!res.ok) navigate("/");
       } catch {
         navigate("/");
@@ -61,12 +66,13 @@ const Navbar = ({ setActivePage }) => {
         method: "POST",
         credentials: "include",
       });
-    } catch {}
+      // Clear all cached data on logout to prevent stale state for next user
+      queryClient.clear();
+    } catch { }
     finally {
       setLoading(false);
     }
 
-    setUser(null);
     navigate("/");
   };
 
@@ -89,7 +95,7 @@ const Navbar = ({ setActivePage }) => {
     );
   };
 
-  // update indicator position on mount and whenever location changes
+  // update indicator position on mount and whenever location or user data changes
   useLayoutEffect(() => {
     const update = () => {
       const keys = Object.keys(linkRefs.current);
@@ -110,9 +116,16 @@ const Navbar = ({ setActivePage }) => {
 
     // call immediately and also on window resize
     update();
+
+    // Also update after a short delay to account for images/icons loading
+    const timer = setTimeout(update, 100);
+
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [location.pathname]);
+    return () => {
+      window.removeEventListener("resize", update);
+      clearTimeout(timer);
+    };
+  }, [location.pathname, me]); // Added 'me' dependency to catch layout shifts after user data loads
 
   return (
     <div className="sidebar" ref={sidebarRef}>
@@ -130,9 +143,9 @@ const Navbar = ({ setActivePage }) => {
       {/* User Info */}
       <div className="user-box">
         <div className="user-role">
-          {user?.role ? user.role.toUpperCase() : ""}
+          {me?.role ? me.role.toUpperCase() : ""}
         </div>
-        <div className="user-name">{user?.fullName || "Guest"}</div>
+        <div className="user-name">{me?.fullName || "Guest"}</div>
       </div>
 
       <p className="section">MAIN MENU</p>

@@ -58,7 +58,7 @@ exports.sendOTP = async (req, res) => {
         role: "volunteer", // default valid enum
         otp: otp,
         otpExpiresAt: otpExpiry,
-        isProfileCompleted: false
+        isProfileCompleted: false,
       });
     } else {
       // Update existing user OTP and expiry
@@ -163,6 +163,8 @@ exports.register = async (req, res) => {
     // Clear OTP
     user.otp = undefined;
     user.otpExpiresAt = undefined;
+
+    
 
     await user.save();
 

@@ -197,4 +197,7 @@ exports.getMe = async (req, res) => {
 		res.status(500).json({ message: "Server error" });
 	}
 };
+// Note: applications are tracked with the Application model and
+// ApplicationController endpoints. The previous `opportunitiesApplied`
+// per-user field was removed as it's not used by the frontend.
 

@@ -6,32 +6,58 @@
   border-right: 1px solid #eee;
   padding: 18px;
   box-sizing: border-box;
-  position: sticky;
-  top: 0;
+  position: relative;
+  /* ensure positioning context for indicator */
   overflow-y: auto;
-  position: relative; /* ensure positioning context for indicator */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Premium Scrollbar for Sidebar */
+.sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
 
 /* Logo Container */
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;           /* Space between icon and text */
-  margin: 10px 0 25px; /* Adjusted margins */
+  gap: 12px;
+  /* Space between icon and text */
+  margin: 10px 0 25px;
+  /* Adjusted margins */
   padding-left: 5px;
 }
 
 /* IMPORTANT: This makes the animated logo visible */
 .logo lord-icon {
-  width: 45px;         /* Set explicit width */
-  height: 45px;        /* Set explicit height */
+  width: 45px;
+  /* Set explicit width */
+  height: 45px;
+  /* Set explicit height */
 }
 
 /* Fixed Logo Title Size */
 .logo-title {
   font-weight: 800;
-  font-size: 22px;     /* Reduced from 40px to fit sidebar width */
-  color: #121331;      /* Matches your lord-icon primary color */
+  font-size: 22px;
+  /* Reduced from 40px to fit sidebar width */
+  color: #121331;
+  /* Matches your lord-icon primary color */
   letter-spacing: -0.5px;
   line-height: 1;
 }
@@ -65,9 +91,12 @@
 
 /* Navigation links */
 .nav-link {
-  display: flex;              /* IMPORTANT */
-  align-items: center;        /* vertical alignment */
-  gap: 10px;                  /* space between icon & text */
+  display: flex;
+  /* IMPORTANT */
+  align-items: center;
+  /* vertical alignment */
+  gap: 10px;
+  /* space between icon & text */
   width: 100%;
   padding: 12px 14px;
   border: none;
@@ -78,7 +107,8 @@
   border-radius: 6px;
   margin-bottom: 8px;
   position: relative;
-  z-index: 2; /* keep links above the sliding background */
+  z-index: 2;
+  /* keep links above the sliding background */
 }
 
 .nav-link:focus {
@@ -92,24 +122,27 @@
 /* sliding background indicator */
 .nav-indicator {
   position: absolute;
-  left: 14px; /* align with link padding */
+  left: 14px;
   right: 14px;
-  background-color: #08C18A; /* requested background color */
-  opacity: 0.12; /* keep highlight subtle */
+  background-color: #08C18A;
   border-radius: 8px;
   z-index: 1;
   transition:
-  top 240ms cubic-bezier(.22,1,.36,1),
-  height 240ms cubic-bezier(.22,1,.36,1),
-  opacity 80ms ease-out;
-
+    top 300ms cubic-bezier(.22, 1, .36, 1),
+    height 300ms cubic-bezier(.22, 1, .36, 1),
+    opacity 150ms ease;
   pointer-events: none;
   opacity: 0;
 }
-.nav-indicator.visible { opacity: 1; }
+
+.nav-indicator.visible {
+  opacity: 1;
+}
 
 /* when a nav link has full active color, keep text readable */
-.nav-link.active { background: transparent; }
+.nav-link.active {
+  background: transparent;
+}
 
 /* Plain links */
 .link-plain {

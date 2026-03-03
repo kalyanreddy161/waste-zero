@@ -1,15 +1,13 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
-import { UserContext } from "../Services/UserContext";
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useRef, useState } from "react";
+import { useQueryClient } from '@tanstack/react-query';
 import MessageBox from "./MessageBox";
 import Loading from "./Loading";
 import "../styles/NavbarComponents-styles/MyProfile.css";
-
-const API_BASE = "http://localhost:3000";
+import { useMe, API_BASE } from "../Services/useMe";
 
 const MyProfile = () => {
-  const { user, refreshUser } = useContext(UserContext);
   const [active, setActive] = useState("profile");
+  const [toggleChecked, setToggleChecked] = useState(false);
   const [editing, setEditing] = useState(false);
 
   // profile form state
@@ -64,20 +62,24 @@ const MyProfile = () => {
     try {
       const v = sessionStorage.getItem('profile_editing');
       if (v === '1') setEditing(true);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error restoring profile editing state:", e);
+    }
   }, []);
 
+  // sync checkbox state with active tab
+  useEffect(() => {
+    setToggleChecked(active === "password");
+  }, [active]);
+
+  const handleToggleChange = (e) => {
+    const checked = e.target.checked;
+    setToggleChecked(checked);
+    setActive(checked ? "password" : "profile");
+  };
+
   // fetch and cache /me using react-query
-  const { data: meData, isLoading: meLoading } = useQuery({
-    queryKey: ["me"],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE}/me`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch user");
-      const payload = await res.json();
-      return payload.user;
-    },
-    staleTime: 60 * 1000,
-  });
+  const { data: meData, isLoading: meLoading } = useMe();
 
   // populate local fields when query returns
   useEffect(() => {
@@ -117,7 +119,9 @@ const MyProfile = () => {
 
   const showMessage = (text, type = "info", timeout = 4000) => {
     // trigger bell animation first
-    try { window.dispatchEvent(new CustomEvent('notify:incoming', { detail: { type } })); } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent('notify:incoming', { detail: { type } })); } catch (e) {
+      console.error("Error triggering bell animation:", e);
+    }
 
     const SHOW_DELAY = 200; // play bell then show
     const FADE_MS = 440; // match CSS closePop animation duration (420ms) + small buffer
@@ -155,7 +159,7 @@ const MyProfile = () => {
   // simple email validation
   const validateEmail = (val) => {
     if (!val) return "";
-    const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\\.,;:\s@\"]+\.)+[^<>()[\]\\.,;:\s@\"]{2,})$/i;
+    const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@(([^<>()[\]\\.,;:\s@"]+\.)+[^<>()[\]\\.,;:\s@"]{2,})$/i;
     return re.test(String(val).toLowerCase()) ? "" : "Enter a valid email";
   };
 
@@ -168,7 +172,7 @@ const MyProfile = () => {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, email: newEmail })
+        body: JSON.stringify({ userId: meData?.id, email: newEmail })
       });
       const data = await res.json();
       if (res.ok) {
@@ -197,7 +201,7 @@ const MyProfile = () => {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, email: newEmail, otp })
+        body: JSON.stringify({ userId: meData?.id, email: newEmail, otp })
       });
       const data = await res.json();
       if (res.ok) {
@@ -205,9 +209,10 @@ const MyProfile = () => {
         setOtp("");
         setOtpSent(false);
         setNewEmailLocked(false);
-        try { sessionStorage.removeItem('profile_editing'); } catch (e) {}
+        try { sessionStorage.removeItem('profile_editing'); } catch (e) {
+          console.error("Error removing profile editing state:", e);
+        }
         resetEditProcess();
-        await refreshUser();
         await queryClient.invalidateQueries({ queryKey: ["me"] });
         setEditing(false);
       } else {
@@ -235,9 +240,10 @@ const MyProfile = () => {
       const data = await res.json();
       if (res.ok) {
         showMessage(data.message || "Profile updated", "success");
-        await refreshUser();
         await queryClient.invalidateQueries({ queryKey: ["me"] });
-        try { sessionStorage.removeItem('profile_editing'); } catch (e) {}
+        try { sessionStorage.removeItem('profile_editing'); } catch (e) {
+          // ignore
+        }
         resetEditProcess();
         setEditing(false);
       } else {
@@ -284,7 +290,7 @@ const MyProfile = () => {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, curpassword, newpassword })
+        body: JSON.stringify({ userId: meData?.id, curpassword, newpassword })
       });
       const data = await res.json();
       if (res.ok) {
@@ -301,7 +307,7 @@ const MyProfile = () => {
   };
 
   // whether the DB has a saved location (distinct from a local capture in this session)
-  const dbHasLocation = Boolean(user && user.location && user.location.coordinates && user.location.coordinates.length === 2);
+  const dbHasLocation = Boolean(meData && meData.location && meData.location.coordinates && meData.location.coordinates.length === 2);
 
   // location label logic (separate from loading text)
   const locationLabel = localCaptured
@@ -312,11 +318,16 @@ const MyProfile = () => {
     <div className="page profile-page">
       <div className="profile-box">
         <div className="profile-box-header">
-          <div className="tab-buttons" role="tablist">
-            <div className="tab-indicator" style={{ transform: active === "profile" ? "translateX(0)" : "translateX(100%)" }} />
-            <button role="tab" aria-selected={active === "profile"} className={`tab-btn ${active === "profile" ? "active" : ""}`} onClick={() => setActive("profile")}>Profile</button>
-            <button role="tab" aria-selected={active === "password"} className={`tab-btn ${active === "password" ? "active" : ""}`} onClick={() => setActive("password")}>Password</button>
-          </div>
+          <label htmlFor="profile-password-toggle" className="switch" aria-label="Toggle Profile/Password">
+            <input 
+              type="checkbox" 
+              id="profile-password-toggle" 
+              checked={toggleChecked}
+              onChange={handleToggleChange}
+            />
+            <span>Profile</span>
+            <span>Password</span>
+          </label>
           <div className="profile-box-actions"></div>
         </div>
 
@@ -325,7 +336,11 @@ const MyProfile = () => {
             <div className="panel-header">
               <div className="panel-title">Profile</div>
               <div className="panel-actions">
-                {editing && withTooltip('Cancel changes', <button className="btn cancel-btn" onClick={() => { try{ sessionStorage.removeItem('profile_editing'); }catch(e){} resetEditProcess(); setEditing(false); }}>Cancel</button>)}
+                {editing && withTooltip('Cancel changes', <button className="btn cancel-btn" onClick={() => {
+                  try { sessionStorage.removeItem('profile_editing'); } catch (e) {
+                    console.error("Error removing profile editing state:", e);
+                  } resetEditProcess(); setEditing(false);
+                }}>Back</button>)}
               </div>
             </div>
 
@@ -334,45 +349,49 @@ const MyProfile = () => {
               <>
                 <div className="doc-row">
                   <div className="field-label">Full name</div>
-                  <div className="doc-value">{fullName || user?.fullName || "—"}</div>
+                  <div className="doc-value">{fullName || meData?.fullName || "—"}</div>
                 </div>
 
                 <div className="doc-row">
                   <div className="field-label">Username</div>
-                  <div className="doc-value">{user?.username || "—"}</div>
+                  <div className="doc-value">{meData?.username || "—"}</div>
                 </div>
 
                 <div className="doc-row">
                   <div className="field-label">Role</div>
-                  <div className="doc-value">{user?.role || "—"}</div>
+                  <div className="doc-value">{meData?.role || "—"}</div>
                 </div>
 
                 <div className="doc-row">
                   <div className="field-label">Skills</div>
-                  <div className="doc-value">{skills ? skills : ((user && user.skills && user.skills.length) ? user.skills.join(", ") : "—")}</div>
+                  <div className="doc-value">{skills ? skills : ((meData && meData.skills && meData.skills.length) ? meData.skills.join(", ") : "—")}</div>
                 </div>
 
                 <div className="doc-row">
                   <div className="field-label">Bio</div>
-                  <div className="doc-value">{bio ? bio : (user?.bio || "—")}</div>
+                  <div className="doc-value">{bio ? bio : (meData?.bio || "—")}</div>
                 </div>
 
                 <div className="doc-row">
                   <div className="field-label">Location</div>
-                  <div className="doc-value">{address ? address : (location && location.coordinates ? `${location.coordinates[1].toFixed(4)}, ${location.coordinates[0].toFixed(4)}` : (user && user.location && user.location.coordinates ? `${user.location.coordinates[1].toFixed(4)}, ${user.location.coordinates[0].toFixed(4)}` : "—"))}</div>
+                  <div className="doc-value">{address ? address : (location && location.coordinates ? `${location.coordinates[1].toFixed(4)}, ${location.coordinates[0].toFixed(4)}` : (meData && meData.location && meData.location.coordinates ? `${meData.location.coordinates[1].toFixed(4)}, ${meData.location.coordinates[0].toFixed(4)}` : "—"))}</div>
                 </div>
 
                 <div className="doc-row">
                   <div className="field-label">Email</div>
-                  <div style={{flex:1, display:"flex", gap:8}}>
-                    <div className="doc-value">{user?.email || "—"}</div>
+                  <div style={{ flex: 1, display: "flex", gap: 8 }}>
+                    <div className="doc-value">{meData?.email || "—"}</div>
                   </div>
                 </div>
 
                 {/* edit button shown at bottom of document only on profile tab */}
                 {active === "profile" && (
                   <div className="profile-actions">
-                    {withTooltip('Edit your profile', <button className="btn btn-primary btn-large" onClick={() => { setLocalCaptured(false); try { sessionStorage.setItem('profile_editing','1'); } catch(e){} setEditing(true); }}>Edit Profile</button>)}
+                    {withTooltip('Edit your profile', <button className="btn btn-primary btn-large" onClick={() => {
+                      setLocalCaptured(false); try { sessionStorage.setItem('profile_editing', '1'); } catch (e) {
+                        console.error("Error setting profile editing state:", e);
+                      } setEditing(true);
+                    }}>Edit Profile</button>)}
                   </div>
                 )}
               </>
@@ -382,15 +401,15 @@ const MyProfile = () => {
             {editing && (
               <>
                 <div className="section-sep">
-                  <div className="section-title" style={{fontWeight:700, marginBottom:8}}>Update Email</div>
+                  <div className="section-title" style={{ fontWeight: 700, marginBottom: 8 }}>Update Email</div>
                   <div className="doc-row">
                     <div className="field-label">Current Email</div>
                     <input type="email" value={currentEmail} disabled />
                   </div>
                   <div className="doc-row">
                     <div className="field-label">New Email</div>
-                    <div style={{flex:1, display:'flex', flexDirection:'column'}}>
-                      <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <input type="email" value={newEmail} onChange={e => {
                           const v = e.target.value;
                           if (!newEmailLocked) setNewEmail(v);
@@ -404,8 +423,8 @@ const MyProfile = () => {
                   </div>
                   <div className="doc-row">
                     <div className="field-label">OTP</div>
-                    <div style={{flex:1, display:'flex', flexDirection:'column'}}>
-                      <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <input className="otp-input" type="number" value={otp} onChange={e => { setOtp(e.target.value); setOtpError(''); }} disabled={!otpSent || isLoading} />
                         {withTooltip(otpSent ? (isLoading ? 'Please wait...' : '') : 'Request OTP first', <button className="btn btn-primary" onClick={handleVerifyAndUpdateEmail} disabled={!otpSent || isLoading}>Verify & Update</button>)}
                       </div>
@@ -414,8 +433,8 @@ const MyProfile = () => {
                   </div>
                 </div>
 
-                <div className="section-sep" style={{marginTop:16}}>
-                  <div className="section-title" style={{fontWeight:700, marginBottom:8}}>Update Personal Details</div>
+                <div className="section-sep" style={{ marginTop: 16 }}>
+                  <div className="section-title" style={{ fontWeight: 700, marginBottom: 8 }}>Update Personal Details</div>
                   <div className="doc-row">
                     <div className="field-label">Skills (comma separated)</div>
                     <input value={skills} onChange={e => setSkills(e.target.value)} />
@@ -426,9 +445,9 @@ const MyProfile = () => {
                   </div>
                   <div className="doc-row">
                     <div className="field-label">Location</div>
-                    <div style={{flex:1, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                      <div style={{flex:1}}>{address ? address : (user && user.location && user.location.coordinates ? 'Not resolved address' : 'Not set')}</div>
-                      <div style={{marginLeft:12}}>
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>{address ? address : (meData && meData.location && meData.location.coordinates ? 'Not resolved address' : 'Not set')}</div>
+                      <div style={{ marginLeft: 12 }}>
                         {withTooltip(navigator.geolocation ? (isLoading ? 'Fetching location...' : (localCaptured ? 'Location captured' : (dbHasLocation ? 'Get new location' : 'Get Location'))) : 'Geolocation not supported', <button className={`btn ${localCaptured || address ? 'btn-primary' : ''}`} onClick={handleFetchLocation} disabled={isLoading}>{isLoading ? 'Fetching...' : locationLabel}</button>)}
                       </div>
                     </div>
