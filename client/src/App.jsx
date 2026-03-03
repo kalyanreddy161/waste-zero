@@ -12,10 +12,25 @@ import Settings from "./components/Settings";
 import HelpSupport from "./components/HelpSupport";
 import AdminPanel from "./components/AdminPanel";
 import Loading from "./components/Loading";
+import PageNotFound from "./components/PageNotFound";
 import { useLoading } from "./Services/LoadingContext";
+import { useEffect } from "react";
+import socket from "./services/socket";
 
 export default function App() {
   const { isLoading } = useLoading();
+
+  useEffect(() => {
+    if ("Notification" in window) {
+      Notification.requestPermission().catch(() => { });
+    }
+
+    // ensure socket connects (socket autoConnect true)
+    // we don't need to do anything else here but keep import to initialize
+    return () => {
+      try { socket.off(); } catch (e) { }
+    };
+  }, []);
 
   return (
     <>
@@ -34,6 +49,7 @@ export default function App() {
           <Route path="admin" element={<AdminPanel />} />
           <Route path="settings" element={<Settings />} />
         </Route>
+        <Route path="*" element={<PageNotFound />} />
       </Routes>
     </>
   );
