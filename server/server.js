@@ -117,6 +117,7 @@ io.on("connection", (socket) => {
     console.log("socket connected for user:", userId);
 
     socket.on("disconnect", () => {
+      console.log("socket disconnected for user:", userId);
       // any cleanup if needed
     });
   } catch (err) {

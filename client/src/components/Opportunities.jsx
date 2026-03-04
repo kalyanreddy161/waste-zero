@@ -8,7 +8,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import MessageBox from "./MessageBox";
 import Loading from "./Loading";
 import MapPicker from "./MapPicker";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import { VolunteerApplicationModal, ApplicationModal } from "./NotificationPanel";
 
 const formatRelativeTime = (iso) => {
@@ -1117,7 +1117,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           <div className="opp-applicants-table">
             <div className="opp-applicants-row opp-applicants-heading-row">
               <div className="opp-applicants-col">Applicant Name</div>
-              <div className="opp-applicants-col">Applied On</div>
+              <div className="opp-applicants-col">Applied</div>
               <div className="opp-applicants-col">Status</div>
               <div className="opp-applicants-col">View Details</div>
             </div>
