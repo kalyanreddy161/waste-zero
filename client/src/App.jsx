@@ -5,7 +5,7 @@ import HomeLayout from "./pages/HomeLayout.jsx";
 import Dashboard from "./components/Dashboard";
 import SchedulePickup from "./components/SchedulePickup";
 import Opportunities from "./components/Opportunities";
-import Messages from "./components/Messages";
+import Messages from "./components/Messages.jsx";
 import MyImpact from "./components/MyImpact";
 import MyProfile from "./components/MyProfile";
 import Settings from "./components/Settings";
