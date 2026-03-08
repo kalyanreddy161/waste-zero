@@ -6,11 +6,14 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 require("dotenv").config();
+
 const authRoutes = require("./routes/RegisterRoutes");
 const profileRoutes = require("./routes/ProfileRoutes");
 const opportunitiesRoutes = require("./routes/OpportunitiesRoutes");
 const applicationRoutes = require("./routes/ApplicationRoutes");
 const notificationRoutes = require("./routes/NotificationRoutes");
+const uploadRoutes = require("./routes/UploadRoutes");
+const pickupRoutes = require("./routes/pickupRoutes"); // ✅ added
 
 const app = express();
 
@@ -48,44 +51,43 @@ store.on("error", (error) => {
 });
 
 /* ======================
-   SESSION MIDDLEWARE  ✅ MUST BE BEFORE ROUTES
+   SESSION MIDDLEWARE
 ====================== */
-// create session middleware instance so it can be reused by socket.io
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "secret123",
   resave: false,
   saveUninitialized: false,
   store: store,
-  // Make the session cookie persistent across browser restarts by setting maxAge.
-  // Configure via env `SESSION_MAX_AGE` (milliseconds). Default: 7 days.
   cookie: {
     httpOnly: true,
-    secure: false, // true only in HTTPS
+    secure: false,
     sameSite: "lax",
     maxAge: process.env.SESSION_MAX_AGE
       ? parseInt(process.env.SESSION_MAX_AGE, 10)
-      : 7 * 24 * 60 * 60 * 1000, // 7 days
+      : 7 * 24 * 60 * 60 * 1000,
   },
 });
 
 app.use(sessionMiddleware);
 
-const uploadRoutes = require("./routes/UploadRoutes");
+/* ======================
+   ROUTES
+====================== */
+
+app.use("/auth", authRoutes);
+app.use("/", profileRoutes);
+app.use("/", opportunitiesRoutes);
+app.use(applicationRoutes);
+app.use(notificationRoutes);
+app.use("/api", uploadRoutes);
+app.use("/api/pickups", pickupRoutes); // ✅ pickup API connected
 
 /* ======================
    SERVER
 ====================== */
+
 const PORT = process.env.PORT || 3000;
 
-// mount routes
-app.use("/auth", authRoutes);
-app.use("/", profileRoutes);
-app.use("/", opportunitiesRoutes);
-app.use(applicationRoutes); // application routes register their own paths
-app.use(notificationRoutes);
-app.use("/api", uploadRoutes);
-
-// create http server and attach socket.io
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -95,16 +97,26 @@ const io = new Server(server, {
   },
 });
 
-// reuse the express session middleware for socket connections
+/* ======================
+   SOCKET SESSION
+====================== */
+
 io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
 
 io.use((socket, next) => {
   const req = socket.request;
-  if (req.session && req.session.isAuthenticated && req.session.user && req.session.user.id) {
+
+  if (
+    req.session &&
+    req.session.isAuthenticated &&
+    req.session.user &&
+    req.session.user.id
+  ) {
     return next();
   }
+
   return next(new Error("unauthorized"));
 });
 
@@ -112,19 +124,16 @@ io.on("connection", (socket) => {
   try {
     const req = socket.request;
     const userId = req.session.user.id;
-    // join a room named after the user id for targeted messages
+
     socket.join(String(userId));
     console.log("socket connected for user:", userId);
 
-    socket.on("disconnect", () => {
-      // any cleanup if needed
-    });
+    socket.on("disconnect", () => {});
   } catch (err) {
     console.error("socket connection error:", err);
   }
 });
 
-// expose io globally so controllers/utilities can use it (simple approach)
 global.io = io;
 
 server.listen(PORT, () => {
