@@ -1,0 +1,8 @@
+/* Ensure only the app's main area scrolls; hide the browser outer scrollbar */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Ensure the app layout main area can scroll (HomeLayout uses inline styles) */
+

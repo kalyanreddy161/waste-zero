@@ -7,7 +7,7 @@ export default function HomeLayout() {
   return (
     <div style={{...layoutStyles.container, height: '100vh', overflow: 'hidden'}}>
       <Navbar />
-      <main style={{...layoutStyles.main, height: '100vh', overflowY: 'auto'}}>
+      <main style={{...layoutStyles.main, height: '100vh', overflowY: 'hidden'}}>
         <Topbar />
         <Outlet />
       </main>

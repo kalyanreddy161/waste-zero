@@ -19,7 +19,6 @@ router.get("/opportunities",checkAuth, OpportunitiesController.getAllOpportuniti
 // Create a new opportunity
 router.post("/opportunities", checkAuth, OpportunitiesController.createOpportunity);
 
-// Add a participant to an opportunity
 // Participants are computed from applications; expose a count endpoint
 router.get("/opportunities/:id/participants-count", checkAuth, OpportunitiesController.getParticipantsCount);
 
@@ -30,3 +29,4 @@ router.put("/opportunities/:id", checkAuth, OpportunitiesController.updateOpport
 router.delete("/opportunities/:id", checkAuth, OpportunitiesController.deleteOpportunity);
 
 module.exports = router;
+

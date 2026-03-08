@@ -1,30 +1,476 @@
-profile page backend check
+changing fetch to react query 
 
 
-🎯 Goal:
-cross checking all these api are working like this or not 
 
-📦 Context:
-create backend apis{
-sendotpforupdateapi :{
-    body: userid, email
-    function: search the user by userid and send otpverification(we already defined in services use that) to body email and upadte the otp, expiry time of that userobject 
-    avoid: not change the user email that will change later
-},
-updateemail: {
-    body: userid, email
-    function: find the userid and change the email and make otp, expiry time to undifined
+🎯 Project Overview
+
+Project Name: WasteZero – Smart Waste Pickup & Recycling Platform
+
+Tech Stack:
+
+MongoDB
+
+Express.js
+
+React.js
+
+Node.js
+
+Socket.IO
+
+express sesion Authentication
+
+The system allows volunteers to apply for NGO opportunities.
+
+We need to implement a real-time notification system for:
+
+Volunteer application alerts to NGO
+
+NGO accept/reject alerts to volunteer
+
+Notification bell realtime updates
+
+Browser notifications when tab inactive
+
+Sound alerts (optional)
+
+Reusability for future chat notifications
+
+🚨 IMPORTANT ARCHITECTURE DECISION
+✅ Use Application Collection as Source of Truth
+Application Schema
+Application {
+  opportunityId: ObjectId,
+  volunteerId: ObjectId,
+  status: "pending" | "accepted" | "rejected",
+  createdAt,
+  updatedAt
 }
-updateprofileapi: {
-    body : userid, fullname,skills, bio, location
-    function: find the userid and change the details
-},
-passwordapi:{
-    body: userid , password
-    function : find the user and change the password
+Add unique index:
+ApplicationSchema.index(
+  { opportunityId: 1, volunteerId: 1 },
+  { unique: true }
+);
+❌ REMOVE THIS LOGIC
+
+REMOVE from backend:
+
+user.opportunitiesApplied.push(opportunityId)
+
+Reason:
+Applied opportunities will now be fetched using:
+
+Application.find({ volunteerId })
+
+This avoids duplication and improves scalability.
+
+🧱 DATABASE MODELS TO IMPLEMENT
+Notification Model (Reusable)
+Notification {
+  receiverId,
+  senderId,
+  type: "application" | "accepted" | "rejected" | "message",
+  referenceId,
+  read: false,
+  createdAt
 }
+
+Used for:
+
+application alerts
+
+acceptance alerts
+
+future chat notifications
+
+⚙️ SOCKET.IO SETUP (BACKEND)
+1️⃣ Attach socket to Express server
+2️⃣ Authenticate using checkauth session
+3️⃣ Join user room on connection
+socket.join(userId);
+
+This allows targeted notifications.
+
+🔔 NOTIFICATION UTILITY (IMPORTANT FOR REUSE)
+
+Create:
+
+utils/sendNotification.js
+
+Function:
+
+sendNotification({
+  io,
+  receiverId,
+  senderId,
+  type,
+  referenceId
+})
+
+This function must:
+
+Save notification in DB
+
+Emit socket event to receiver room
+
+🚀 VOLUNTEER APPLY FLOW
+Backend Controller: applyOpportunity
+Steps:
+1️⃣ Validate opportunity exists
+2️⃣ Prevent duplicate application
+3️⃣ Create Application
+status = "pending"
+4️⃣ Create notification for NGO
+
+type: "application"
+
+5️⃣ Emit socket event
+
+Event name:
+
+newApplication
+
+to NGO room.
+
+🏢 NGO REALTIME DASHBOARD
+
+When NGO is online:
+
+Listen for:
+
+newApplication
+
+Update:
+
+✔ notification bell count
+✔ show toast
+✔ show browser notification if tab hidden
+✔ play sound (optional)
+
+🚀 NGO ACCEPT / REJECT FLOW
+Controller: respondApplication
+Steps:
+
+1️⃣ Update application status
+2️⃣ Create notification for volunteer
+
+type:
+
+accepted
+
+rejected
+
+3️⃣ Emit event:
+
+applicationResponse
+
+to volunteer room.
+
+👤 VOLUNTEER REALTIME UPDATE
+
+Listen for:
+
+applicationResponse
+
+Then:
+
+✔ show toast / alert
+✔ update application status UI
+✔ update notification bell
+
+🔔 FETCH APPLIED OPPORTUNITIES (NEW)
+Volunteer Dashboard API
+Application.find({ volunteerId })
+  .populate("opportunityId")
+
+Return:
+
+opportunity details
+
+application status
+
+🔔 NGO FETCH APPLICANTS
+Application.find({ opportunityId })
+  .populate("volunteerId")
+🔔 NOTIFICATION API ROUTES
+
+Create routes:
+
+GET /notifications
+GET /notifications/unread-count
+PUT /notifications/:id/read
+
+🌐 FRONTEND SOCKET SETUP
+
+Create:
+
+/services/socket.js
+
+connect once
+
+attach session
+
+export socket instance
+
+🔔 REALTIME BELL UPDATE
+socket.on("newApplication", () => {
+  setBellCount(prev => prev + 1);
+});
+🌐 BROWSER TAB NOTIFICATION SUPPORT
+Ask permission once
+Notification.requestPermission();
+Detect hidden tab & show notification
+if (document.hidden && Notification.permission === "granted") {
+  new Notification("New volunteer applied!");
+}
+🔊 OPTIONAL SOUND ALERT
+
+Place notify.mp3 in public folder.
+
+if (document.hidden) {
+  new Audio("/notify.mp3").play();
+}
+🧪 FULL NGO LISTENER EXAMPLE
+socket.on("newApplication", () => {
+
+  setBellCount(prev => prev + 1);
+
+  if (document.hidden && Notification.permission === "granted") {
+    new Notification("New volunteer applied!");
+  }
+
+  if (document.hidden) {
+    new Audio("/notify.mp3").play();
+  }
+
+});
+🔐 SECURITY REQUIREMENTS
+
+verify seccion on socket connection
+
+only authenticated users can connect
+
+prevent impersonation
+
+⚠️ IMPORTANT RULES
+
+✔ Database stores truth
+✔ Socket delivers realtime updates
+✔ REST APIs handle business logic
+✔ Notifications saved for offline users
+✔ No duplicate relationship arrays
+
+🎯 EXPECTED RESULT
+
+✅ NGO sees application instantly
+✅ Volunteer gets acceptance instantly
+✅ Notification bell updates live
+✅ Browser shows alerts if tab inactive
+✅ Sound alert plays (optional)
+✅ Applied opportunities fetched via Application model
+✅ System ready for chat notifications reuse
+
+
+
+
+
+
+
+
+inroducing maps in opportunites from
+
+
+in opportunites page in form that opens on click create button.in that form    
+on click choose location button maps have to open in a pop up window with 90vh , 90vw arounded spacing .
+ In that window ui consist map tiles using(osm=openstreetmap + leaflet make setup for this), and text input that takes input form the user.search button , back button, proceed with this location button(appear at bottom ) remaining on top.
+
+behaviour:
+On click choose location button maps have to open user able to point a location/drop a pin capture that lat,lon of that pin and enables proceed with this location button . Use osm+leaflet to capture the lat,lon of that pin. On click proceed with this button call close the map window and back to from start loading effect and call this api 
+`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+ reverse order which take input as lat,lon (return by the leaflet) and return address in json format then extract village/town/city. Set below city input valve by this city name .Choose the priority is village exist don't go for town and city.
+
+Text Input in maps window function behaviour: 
+user enters a location in text format in that input .on click search button call this geocoding api 
+https://nominatim.openstreetmap.org/search?q=TEXT_ADDRESS&format=json&limit=1
+ it return lat,lon .then move the map to that lat and long. 
+
+I want this behaviour for opportunities form .
+Already we have the create opportunities functons that talk to server make changes if required. 
+
+
+
+
+
+ai response
+
+
+What I changed
+
+Added a new map picker component: MapPicker.jsx
+Wired the picker into the create/edit modal in client/src/components/Opportunities.jsx:
+Choose Location now opens the map popup.
+Map selection (click) or geocoding (search) places a pin and enables Proceed with this location.
+On proceed the component reverse-geocodes via Nominatim, prioritizes village > town > city and sets the city field; it also stores the picked coords.
+The create/update requests now include location: { type: 'Point', coordinates: [lat, lon] }.
+Create/edit modal resets/loads location when opening for create/edit.
+Added leaflet to package.json dependencies.
+Next steps for you (run locally)
+Test flow:
+Open Opportunities page, click + Create Opportunity.
+Click Choose Location → map popup (90vw × 90vh).
+Click map to drop a pin or use the search input → then click Proceed with this location.
+Confirm the City field is populated (village preferred); submit the form to create the opportunity.
+Notes & edge cases
+
+Nominatim is used for geocoding/reverse-geocoding (no server proxy). If you need an API key or heavy usage you should proxy or throttle requests.
+The project sends location coordinates as [lat, lon] to match existing display code (formatLocationDisplay expects [lat, lon]).
+Want me to:
+
+Run npm install and start the dev server here?
+Or adjust styling/positioning of the picker (e.g., different button text, icons, or map defaults)?
+
+
+
+Showing opportunities to user :
+
+in a order for both dashboard page and opportunites page which ui showing opportunites: 
+
+
+Get all opportunities form the db .
+Extract location coordinates from all opportunities objects.
+Calculate the distance shortest distance between user location and the
+each  opportunities location by using 
+This Haversine formula  based on that distance arrange opportunities in ascending order .
+Main thing is we have to cache this opportunites  and its order so we don't want to run every time the components mounts .
+we have to run only on when a user creates a oppotunity or edit oportunity or delete opportunity .
+so when these operations occurs the server emit globally and all the user and ngos listens for that emit . so when the emit occurs the cache will have to upatated and ui have chnage instantly with out any refresh.
+make sure with these :
+avoid duplicate refetching, 
+and basic mistakes while using react query.
+
+
+
+
+global listeners.....
+
+understand the code base then proceed .
+when the opportunites component is initated the opportunites are automatically updating . but not in component demounts so those listeners who listening these create, updates, deletions are have to listen globally(where ever in the app) instead of listening only when components mounts. so the updates are automatically upadted even user whereever in the app.
+
+
+
+dashboard ui update .....
+
+here we are going modifiy the  dashboard page ui :
+leave the top static html .
+below remove  all the ui part opportunites , my application remove that(leave application template that template we will use it again here also).
+after removing that app ui part .
+below the static dashboard ui add a 1 toggle switch .
+use exact this styling for that 
+css:
+
+/* From Uiverse.io by cbolson */
+.switch {
+  --_switch-bg-clr: #EAFAF6;
+  --_switch-padding: 4px;
+  --_slider-bg-clr: #08B783;
+  --_slider-bg-clr-on: #08B783;
+  --_label-padding: 1rem 2rem;
+  --_switch-easing: cubic-bezier(0.47, 1.64, 0.41, 0.8);
+
+  width: fit-content;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 9999px;
+  cursor: pointer;
+  position: relative;
+  isolation: isolate;
 }
 
+/* Hide checkbox */
+.switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Labels */
+.switch > span {
+  display: grid;
+  place-content: center;
+  padding: var(--_label-padding);
+  transition: opacity 300ms ease-in-out 150ms;
+  color: black; /* Default OFF text color */
+  z-index: 1;
+}
+
+/* Slider */
+.switch::before,
+.switch::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+}
+
+.switch::before {
+  background-color: var(--_slider-bg-clr);
+  inset: var(--_switch-padding) 50% var(--_switch-padding) var(--_switch-padding);
+  transition:
+    inset 500ms var(--_switch-easing),
+    background-color 500ms ease-in-out;
+  z-index: 0;
+}
+
+/* Background */
+.switch::after {
+  background-color: var(--_switch-bg-clr);
+  inset: 0;
+  z-index: -1;
+}
+
+/* Checked state */
+.switch:has(input:checked)::before {
+  inset: var(--_switch-padding) var(--_switch-padding) var(--_switch-padding) 50%;
+  background-color: var(--_slider-bg-clr-on);
+}
+
+/* Active text color (inside slider) */
+.switch:has(input:not(:checked)) > span:first-of-type,
+.switch:has(input:checked) > span:last-of-type {
+  color: white;
+}
+
+/* Opacity styling */
+.switch > span:last-of-type,
+.switch > input:checked + span:first-of-type {
+  opacity: 0.75;
+}
+
+.switch > input:checked ~ span:last-of-type {
+  opacity: 1;
+}
+html element:
+
+<label for="filter" class="switch" aria-label="Toggle Filter">
+  <input type="checkbox" id="filter" />
+  <span>Opportunities</span>
+  <span>My Opportunities</span>
+</label>
+
+.the toggle switchs are 1.opportunites and  2.my application if user.role is volunteer .
+and 
+the toggle switch are 1.opportunites and 2.my opportunites if the user.role is NGO
+by default switch to opportunites.
+for both volunteer, NGO on click opportunites toggle switch display the opprtunites same as the opportunites page (use exact template here. i want same template here also but with one conditon the button view detalis button text = apply now if user.role is volunteer , and text = view details if user.role is ngo), including create opportunites button with functionality and exclude filter button(don't create additional window just place all templates)
+on click my applications(user.role is volunteer) .show the all appliaction applied by the logged user .use present template but with some modification below title remove description show only date with label(date 14-01-2025).remiaining all same the old template.
+on click my opportuintes (user.role id NGO) display all opportunites created by logged ngo.
+don't break any javascript logic just change the ui structure.
+the opportunites  data come from cache as before.
 
 
 
@@ -33,38 +479,150 @@ passwordapi:{
 
 
 
+css:
+
+/* From Uiverse.io by cbolson */
+.switch {
+  --_switch-bg-clr: #EAFAF6;
+  --_switch-padding: 4px;
+  --_slider-bg-clr: #08B783;
+  --_slider-bg-clr-on: #08B783;
+  --_label-padding: 1rem 2rem;
+  --_switch-easing: cubic-bezier(0.47, 1.64, 0.41, 0.8);
+
+  width: fit-content;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 9999px;
+  cursor: pointer;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Hide checkbox */
+.switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Labels */
+.switch > span {
+  display: grid;
+  place-content: center;
+  padding: var(--_label-padding);
+  transition: opacity 300ms ease-in-out 150ms;
+  color: black; /* Default OFF text color */
+  z-index: 1;
+}
+
+/* Slider */
+.switch::before,
+.switch::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+}
+
+.switch::before {
+  background-color: var(--_slider-bg-clr);
+  inset: var(--_switch-padding) 50% var(--_switch-padding) var(--_switch-padding);
+  transition:
+    inset 500ms var(--_switch-easing),
+    background-color 500ms ease-in-out;
+  z-index: 0;
+}
+
+/* Background */
+.switch::after {
+  background-color: var(--_switch-bg-clr);
+  inset: 0;
+  z-index: -1;
+}
+
+/* Checked state */
+.switch:has(input:checked)::before {
+  inset: var(--_switch-padding) var(--_switch-padding) var(--_switch-padding) 50%;
+  background-color: var(--_slider-bg-clr-on);
+}
+
+/* Active text color (inside slider) */
+.switch:has(input:not(:checked)) > span:first-of-type,
+.switch:has(input:checked) > span:last-of-type {
+  color: white;
+}
+
+/* Opacity styling */
+.switch > span:last-of-type,
+.switch > input:checked + span:first-of-type {
+  opacity: 0.75;
+}
+
+.switch > input:checked ~ span:last-of-type {
+  opacity: 1;
+}
+html element:
+
+<label for="filter" class="switch" aria-label="Toggle Filter">
+  <input type="checkbox" id="filter" />
+  <span>Profile</span>
+  <span>Password</span>
+</label>
 
 
-profile page ui and functionality
 
 
+socket.on('opportunityUpdated', (updatedOpportunity) => {
 
-🎯 Goal:
-add api call to front end to achive the functionality with the ui and add ui for profile.jsx 
-in format :
-top block profile, password toggle switch 
-below
-left block(appear on click profile switch){
-ui:
-first a normal static document showing user details with good alignment and spacing , text size
-in this block on top right put a edit button on click that edit button make below things are able to edit and seperate two section update email, update user personal details
-update email section:  input(type:email value: useremail always unable to edit), input(type : email placeholder : enter new email), get otp button , input(type:number) , verify and upadte button,
-functionality:
-on click edit button able to edit sepereting two sections
-    section1 functionality: user enter newemail, on click dend otp call sendotpforupdate(as body: present logged user id, entered new email) and make sendotp button = disable to avoid multiple fetch and freeze the new entered email to make unable to edit after sending otp and make enable otp input, verify & upadte button (until make it disable)
-                            user enter otp, onclick verify and update button call updateemail api and display the respone that sucess or failed 
-upadte user personal details section : personal info inputs(fullname , skills, bio , get location(it a function that fetches the current location)) exclude username , update profile button
-functionality : the inputs are filled with if the details are exist and able to modify on click update profile button call updateprofileapi and display the respone is sucess or failed 
-},
-right block(appear on click password switch){
-ui: 
-three inputs(current password, new password, confirm password), upadte password button 
-functionality: onclick update password button call updatepassword api to change the password and display the response is sucess of failed
-}, 
-add component : create a component messagebox this component is use to display the response whne is requried make sure use in this profile page ,
-style : mantain good styles , add animation(slidiing if possible)
+  // Update opportunities cache
+  queryClient.setQueryData(['opportunities'], old =>
+    old?.map(o =>
+      o.id === updatedOpportunity.id ? updatedOpportunity : o
+    )
+  )
+
+  // Update applications cache
+  queryClient.setQueryData(['applications'], old =>
+    old?.map(app =>
+      app.opportunityId === updatedOpportunity.id
+        ? { ...app, opportunity: updatedOpportunity }
+        : app
+    )
+  )
+})
 
 
 
 
-backend schedule and pick up
+
+
+
+
+understand the code base then proceed.
+in dashboard below this(Dashboard
+Welcome back, venkat! Here's your waste management overview.)
+Add card like this image but not these items change the titles.
+1.active opportunities 
+2.opportunites you joined(if user.role is volunteer)/your opportuintes(if user.role is NGO)
+3.pickup's completed 
+4.co2 saved
+I want the real data form db.so
+For active opportunities calculate total no.of opportunities with status open and in progress.i want real time data .so when opportunities created emit a global event for all user both ngo, volunteer.and here user also have to listen globally(Not when component initiated.currently we  are listening some emit globally form topbar.jsx).so when ngo user  created a opportunity with status open or in progress ngo 
+Emits event to all user and users have to listen those emits .so the count will update automatically without any refresh.
+
+For opportunities you joined calculate total applications with userid = logged user id.in that find with status accepted then return this count for opportunities you joined.this also real time data so when ngo reply to a particular volunteer user an volunteer user .this is already implemented In notification palnel.jsx or in some other file check that .and use that listen update the count if application status is accepted.
+for my opportunites calculate total opportuintes created by the logged NGO.
+For pickup and CO2 saved  now no need add a dummy number we implement later.
+
+goal: display the real time count.
+
+
+admin:  
+
+

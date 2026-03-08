@@ -12,21 +12,15 @@ const MessageBox = ({ message, type = "info", closing = false }) => {
     return () => window.clearTimeout(t);
   }, []);
 
-  // keep transform stable on closing; parent will set `closing` and remove after fade
-  useEffect(() => {
-    if (closing) {
-      setVisible(true);
-    }
-  }, [closing]);
-
   const style = { borderColor: color };
+  const isVisible = visible || closing;
 
   const title = type === 'success' ? 'Success !' : (type === 'error' ? 'Failed !' : 'Notice');
 
   return (
     <div
       ref={ref}
-      className={`messagebox ${visible ? 'show' : ''} ${closing ? 'closing' : ''}`}
+      className={`messagebox ${isVisible ? 'show' : ''} ${closing ? 'closing' : ''}`}
       style={style}
       aria-live="polite"
     >

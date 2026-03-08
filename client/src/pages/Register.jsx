@@ -1,19 +1,21 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState } from "react";
+import MessageBox from "../components/MessageBox";
 import { useNavigate } from "react-router-dom";
 import "../styles/Register.css";
-import { UserContext } from "../Services/UserContext";
 import { useLoading } from "../Services/LoadingContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { API_BASE, meQueryOptions } from "../Services/useMe";
 
-const API = "http://localhost:3000/auth";
+const API = `${API_BASE}/auth`;
 
 export default function Register() {
   const navigate = useNavigate();
-  const { setUser } = useContext(UserContext);
+  const queryClient = useQueryClient();
 
 
-    /* ======================
-     SESSION CHECK ON LOAD
-  ====================== */
+  /* ======================
+   SESSION CHECK ON LOAD
+====================== */
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -21,11 +23,10 @@ export default function Register() {
           credentials: "include",
         });
 
-            if (res.ok) {
-              const data = await res.json();
-              if (data.user) setUser(data.user);
-              navigate("/home");
-            }
+        if (res.ok) {
+          const data = await res.json();
+          navigate("/home");
+        }
       } catch (err) {
         // stay on login page
       }
@@ -64,6 +65,32 @@ export default function Register() {
   const [usernameExists, setUsernameExists] = useState(false);
   const [registerWarning, setRegisterWarning] = useState("");
   const { isLoading, setLoading, withLoading } = useLoading();
+  const [notification, setNotification] = useState({ open: false, message: "", type: "info", closing: false });
+
+  const showMessage = (msg, type = "info", duration = 3000) => {
+    setNotification({ open: true, message: msg, type, closing: false });
+    window.setTimeout(() => {
+      setNotification((s) => ({ ...s, closing: true }));
+      window.setTimeout(() => setNotification({ open: false, message: "", type: "info", closing: false }), 300);
+    }, duration);
+  };
+
+  // read any global message placed in sessionStorage (e.g. logout/login redirects)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const raw = sessionStorage.getItem('global_message');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.message) {
+            showMessage(parsed.message, parsed.type || 'info');
+          }
+          sessionStorage.removeItem('global_message');
+        }
+      } catch (e) {}
+    }, 150);
+    return () => clearTimeout(t);
+  }, []);
 
 
   /* ======================
@@ -181,7 +208,15 @@ export default function Register() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.user) setUser(data.user);
+        // Clear anything left in cache before identifying new user
+        queryClient.clear();
+        // Fetch and cache user data immediately on registration
+        await queryClient.fetchQuery(meQueryOptions);
+        // show welcome message on the home page after redirect
+        try {
+          const user = queryClient.getQueryData(meQueryOptions.queryKey);
+          if (user && user.fullName) sessionStorage.setItem('global_message', JSON.stringify({ message: `Welcome ${user.fullName}`, type: 'success' }));
+        } catch (e) {}
         navigate("/home");
         return;
       }
@@ -235,6 +270,7 @@ export default function Register() {
         }
 
         setOtpSent(true);
+          showMessage("OTP sent to your email", "success");
       } catch (err) {
         setLoading(false);
         setOtpError(err.message || "Failed to send OTP");
@@ -269,6 +305,7 @@ export default function Register() {
 
         setOtpVerified(true);
         setOtpError("");
+          showMessage("OTP verified", "success");
       } catch (err) {
         setLoading(false);
         setOtpError(err.message || "OTP verification failed");
@@ -283,7 +320,7 @@ export default function Register() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
- 
+
     try {
       setLoading(true);
       const res = await fetch(`${API}/login`, {
@@ -298,7 +335,15 @@ export default function Register() {
       if (!res.ok) {
         setLoginError(data.message || "Invalid credentials");
       } else {
-        if (data.user) setUser(data.user);
+        // Clear anything left in cache before identifying new user
+        queryClient.clear();
+        // Fetch and cache user data immediately on login
+        await queryClient.fetchQuery(meQueryOptions);
+        // show welcome back message on home page
+        try {
+          const user = queryClient.getQueryData(meQueryOptions.queryKey);
+          if (user && user.fullName) sessionStorage.setItem('global_message', JSON.stringify({ message: `Welcome back ${user.fullName}`, type: 'success' }));
+        } catch (e) {}
         navigate("/home");
       }
     } catch (err) {
@@ -314,11 +359,11 @@ export default function Register() {
         <div className="register-left">
           <div className="register-logo">
             <lord-icon
-            src="https://cdn.lordicon.com/zruuduya.json"
-            trigger="hover"
-            colors="primary:#121331,secondary:#ffffff"
-            style={{ width: "50px", height: "50px" }}
-          ></lord-icon>
+              src="https://cdn.lordicon.com/zruuduya.json"
+              trigger="hover"
+              colors="primary:#121331,secondary:#ffffff"
+              style={{ width: "50px", height: "50px" }}
+            ></lord-icon>
             <span> WasteZero</span>
           </div>
 
@@ -331,280 +376,285 @@ export default function Register() {
           </p>
 
           <div className="register-features">
-        <div>
-          <h4>Schedule Pickups</h4>
-          <p>Easily arrange waste collection</p>
-        </div>
+            <div>
+              <h4>Schedule Pickups</h4>
+              <p>Easily arrange waste collection</p>
+            </div>
 
-        <div>
-          <h4>Track Impact</h4>
-          <p>Monitor your environmental contribution</p>
-        </div>
+            <div>
+              <h4>Track Impact</h4>
+              <p>Monitor your environmental contribution</p>
+            </div>
 
-        <div>
-          <h4>Volunteer</h4>
-          <p>Join recycling initiatives</p>
-        </div>
-      </div>
+            <div>
+              <h4>Volunteer</h4>
+              <p>Join recycling initiatives</p>
+            </div>
+          </div>
         </div>
 
         <div className="register-right page-center">
           <div className="auth-card">
 
-        {/* Tabs */}
-        <div className="tab-header">
-          <button
-            className={mode === "login" ? "active" : ""}
-            onClick={() => setMode("login")}
-          >
-            Login
-          </button>
-          <button
-            className={mode === "register" ? "active" : ""}
-            onClick={() => setMode("register")}
-          >
-            Register
-          </button>
-        </div>
-
-        {/* Forms */}
-        <div className="form-wrapper">
-          <div className={`form-slider ${mode}`}>
-
-            {/* LOGIN */}
-            <form className="form-panel" onSubmit={handleLogin}>
-              <h2>Welcome Back</h2>
-              <p>Login to continue WasteZero</p>
-
-              <div className="input-container">
-                <input
-                  type="text"
-                  name="username"
-                  placeholder="Enter username"
-                  className="input-field"
-                  onChange={handleLoginChange}
-                />
-                <label className="input-label">Username</label>
-                <span className="input-highlight"></span>
-              </div>
-
-              <div className="input-container">
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="Enter password"
-                  className="input-field"
-                  onChange={handleLoginChange}
-                />
-                <label className="input-label">Password</label>
-                <span className="input-highlight"></span>
-              </div>
-
-              {loginError && (
-                <p style={{ color: "red", fontSize: "0.85rem" }}>
-                  {loginError}
-                </p>
-              )}
-
-              <button className="primary-btn">Login</button>
-            </form>
-
-            {/* REGISTER */}
-            <form className="form-panel" onSubmit={handleRegister} noValidate>
-              <h2>Create a new account</h2>
-              <p>Fill in your details to join WasteZero</p>
-
-              {/* Full Name */}
-              <div className="input-container">
-                <input
-                  type="text"
-                  name="fullName"
-                  placeholder="Your full name"
-                  className="input-field"
-                  onChange={handleRegisterChange}
-                />
-                <label className="input-label">Full Name</label>
-                <span className="input-highlight"></span>
-              </div>
-
-              {/* Email */}
-              <div className="input-container">
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Your email"
-                  className="input-field"
-                  onChange={handleRegisterChange}
-                />
-                <label className="input-label">Email</label>
-                <span className="input-highlight"></span>
-              </div>
-              {emailExists && (
-                <p style={{ color: "red", fontSize: "0.85rem" }}>
-                  Email already exists
-                </p>
-              )}
-
-              {/* Username */}
-              <div className="input-container">
-                <input
-                  type="text"
-                  name="username"
-                  placeholder="Choose a username"
-                  className="input-field"
-                  onChange={handleRegisterChange}
-                />
-                <label className="input-label">Username</label>
-                <span className="input-highlight"></span>
-              </div>
-              {usernameExists && (
-                <p style={{ color: "red", fontSize: "0.85rem" }}>
-                  Username already exists
-                </p>
-              )}
-
-              {/* Passwords */}
-              <div className="row">
-                <div className="input-container">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="Create password"
-                    className="input-field"
-                    onChange={handleRegisterChange}
-                  />
-                  <label className="input-label">Password</label>
-                  <span className="input-highlight"></span>
-                </div>
-
-                <div className="input-container">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="confirmPassword"
-                    placeholder="Confirm password"
-                    className="input-field"
-                    onChange={handleRegisterChange}
-                  />
-                  <label className="input-label">Confirm Password</label>
-                  <span className="input-highlight"></span>
-                </div>
-              </div>
-
-              {!passwordsMatch && registerData.confirmPassword && (
-                <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
-                  Passwords do not match
-                </p>
-              )}
-
-              {/* SHOW PASSWORD */}
-              <div className="show-password">
-                <input
-                  type="checkbox"
-                  id="showPwd"
-                  onChange={() => setShowPassword(!showPassword)}
-                />
-                <label htmlFor="showPwd">Show Password</label>
-              </div>
-
-              {/* Role */}
-              <div className="input-container">
-                <select
-                  name="role"
-                  className="input-field"
-                  onChange={handleRegisterChange}
-                >
-                  <option value="">Select role</option>
-                  <option>Volunteer</option>
-                  <option>NGO</option>
-                  <option>Admin</option>
-                </select>
-              </div>
-
-              {/* OTP: Get / Verify */}
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-                <div className="input-container" style={{ flex: 7, minWidth: 0 }}>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    name="pasteOTP"
-                    placeholder="Paste OTP"
-                    className="input-field"
-                    value={pasteOTP}
-                    onChange={(e) => {
-                      setPasteOTP(e.target.value.replace(/[^0-9]/g, ""));
-                      setOtpError("");
-                    }}
-                    autoComplete="one-time-code"
-                  />
-                  <label className="input-label">Paste OTP</label>
-                  <span className="input-highlight"></span>
-                </div>
-
-                <button
-                  type="button"
-                  className="primary-btn"
-                  onClick={handleOtpButtonClick}
-                  style={{
-                    flex: 3,
-                    padding: "10px 12px",
-                    fontSize: "0.95rem",
-                    cursor: emailExists ? "not-allowed" : undefined,
-                    opacity: emailExists ? 0.6 : 1
-                  }}
-                  disabled={emailExists || isLoading}
-                  title={emailExists ? "Email already exists" : undefined}
-                >
-                  {otpSent ? "Verify OTP" : "Get OTP"}
-                </button>
-              </div>
-
-              {(otpError || emailExists) && (
-                <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
-                  {otpError || (emailExists ? "Email already exists" : "")}
-                </p>
-              )}
-
-              {otpVerified && (
-                <p style={{ color: "green", fontSize: "0.85rem", marginTop: 6 }}>
-                  OTP verified ✓
-                </p>
-              )}
-
-              {registerWarning && (
-                <p style={{ color: "red", fontSize: "0.95rem", marginTop: 8 }}>
-                  {registerWarning}
-                </p>
-              )}
-
+            {/* Tabs */}
+            <div className="tab-header">
               <button
-                className="primary-btn"
-                type="submit"
-                disabled={
-                  !otpVerified ||
-                  !registerData.fullName ||
-                  !registerData.email ||
-                  !registerData.username ||
-                  !registerData.password ||
-                  !registerData.confirmPassword ||
-                  !registerData.role ||
-                  emailExists ||
-                  usernameExists ||
-                  isLoading
-                }
-                title={
-                  otpVerified ? undefined : "Please verify OTP to create account"
-                }
-                style={{ cursor: otpVerified ? "pointer" : "not-allowed" }}
+                className={mode === "login" ? "active" : ""}
+                onClick={() => setMode("login")}
               >
-                Create Account
+                Login
               </button>
-            </form>
+              <button
+                className={mode === "register" ? "active" : ""}
+                onClick={() => setMode("register")}
+              >
+                Register
+              </button>
+            </div>
 
-          </div>
-        </div>
+            {/* Forms */}
+            <div className="form-wrapper">
+              <div className={`form-slider ${mode}`}>
+
+                {/* LOGIN */}
+                <form className="form-panel" onSubmit={handleLogin}>
+                  <h2>Welcome Back</h2>
+                  <p>Login to continue WasteZero</p>
+
+                  <div className="input-container">
+                    <input
+                      type="text"
+                      name="username"
+                      placeholder="Enter username"
+                      className="input-field"
+                      onChange={handleLoginChange}
+                    />
+                    <label className="input-label">Username</label>
+                    <span className="input-highlight"></span>
+                  </div>
+
+                  <div className="input-container">
+                    <input
+                      type="password"
+                      name="password"
+                      placeholder="Enter password"
+                      className="input-field"
+                      onChange={handleLoginChange}
+                    />
+                    <label className="input-label">Password</label>
+                    <span className="input-highlight"></span>
+                  </div>
+
+                  {loginError && (
+                    <p style={{ color: "red", fontSize: "0.85rem" }}>
+                      {loginError}
+                    </p>
+                  )}
+
+                  <button className="primary-btn">Login</button>
+                </form>
+
+                {/* REGISTER */}
+                <form className="form-panel" onSubmit={handleRegister} noValidate>
+                  <h2>Create a new account</h2>
+                  <p>Fill in your details to join WasteZero</p>
+
+                  {/* Full Name */}
+                  <div className="input-container">
+                    <input
+                      type="text"
+                      name="fullName"
+                      placeholder="Your full name"
+                      className="input-field"
+                      onChange={handleRegisterChange}
+                    />
+                    <label className="input-label">Full Name</label>
+                    <span className="input-highlight"></span>
+                  </div>
+
+                  {/* Email */}
+                  <div className="input-container">
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Your email"
+                      className="input-field"
+                      onChange={handleRegisterChange}
+                    />
+                    <label className="input-label">Email</label>
+                    <span className="input-highlight"></span>
+                  </div>
+                  {emailExists && (
+                    <p style={{ color: "red", fontSize: "0.85rem" }}>
+                      Email already exists
+                    </p>
+                  )}
+
+                  {/* Username */}
+                  <div className="input-container">
+                    <input
+                      type="text"
+                      name="username"
+                      placeholder="Choose a username"
+                      className="input-field"
+                      onChange={handleRegisterChange}
+                    />
+                    <label className="input-label">Username</label>
+                    <span className="input-highlight"></span>
+                  </div>
+                  {usernameExists && (
+                    <p style={{ color: "red", fontSize: "0.85rem" }}>
+                      Username already exists
+                    </p>
+                  )}
+
+                  {/* Passwords */}
+                  <div className="row">
+                    <div className="input-container">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        placeholder="Create password"
+                        className="input-field"
+                        onChange={handleRegisterChange}
+                      />
+                      <label className="input-label">Password</label>
+                      <span className="input-highlight"></span>
+                    </div>
+
+                    <div className="input-container">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="confirmPassword"
+                        placeholder="Confirm password"
+                        className="input-field"
+                        onChange={handleRegisterChange}
+                      />
+                      <label className="input-label">Confirm Password</label>
+                      <span className="input-highlight"></span>
+                    </div>
+                  </div>
+
+                  {!passwordsMatch && registerData.confirmPassword && (
+                    <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
+                      Passwords do not match
+                    </p>
+                  )}
+
+                  {/* SHOW PASSWORD */}
+                  <div className="show-password">
+                    <input
+                      type="checkbox"
+                      id="showPwd"
+                      onChange={() => setShowPassword(!showPassword)}
+                    />
+                    <label htmlFor="showPwd">Show Password</label>
+                  </div>
+
+                  {/* Role */}
+                  <div className="input-container">
+                    <select
+                      name="role"
+                      className="input-field"
+                      onChange={handleRegisterChange}
+                    >
+                      <option value="">Select role</option>
+                      <option>Volunteer</option>
+                      <option>NGO</option>
+                      <option>Admin</option>
+                    </select>
+                  </div>
+
+                  {/* OTP: Get / Verify */}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                    <div className="input-container" style={{ flex: 7, minWidth: 0 }}>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        name="pasteOTP"
+                        placeholder="Paste OTP"
+                        className="input-field"
+                        value={pasteOTP}
+                        onChange={(e) => {
+                          setPasteOTP(e.target.value.replace(/[^0-9]/g, ""));
+                          setOtpError("");
+                        }}
+                        autoComplete="one-time-code"
+                      />
+                      <label className="input-label">Paste OTP</label>
+                      <span className="input-highlight"></span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      onClick={handleOtpButtonClick}
+                      style={{
+                        flex: 3,
+                        padding: "10px 12px",
+                        fontSize: "0.95rem",
+                        cursor: emailExists ? "not-allowed" : undefined,
+                        opacity: emailExists ? 0.6 : 1
+                      }}
+                      disabled={emailExists || isLoading}
+                      title={emailExists ? "Email already exists" : undefined}
+                    >
+                      {otpSent ? "Verify OTP" : "Get OTP"}
+                    </button>
+                  </div>
+
+                  {(otpError || emailExists) && (
+                    <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
+                      {otpError || (emailExists ? "Email already exists" : "")}
+                    </p>
+                  )}
+
+                  {otpVerified && (
+                    <p style={{ color: "green", fontSize: "0.85rem", marginTop: 6 }}>
+                      OTP verified ✓
+                    </p>
+                  )}
+
+                  {registerWarning && (
+                    <p style={{ color: "red", fontSize: "0.95rem", marginTop: 8 }}>
+                      {registerWarning}
+                    </p>
+                  )}
+
+                  <button
+                    className="primary-btn"
+                    type="submit"
+                    disabled={
+                      !otpVerified ||
+                      !registerData.fullName ||
+                      !registerData.email ||
+                      !registerData.username ||
+                      !registerData.password ||
+                      !registerData.confirmPassword ||
+                      !registerData.role ||
+                      emailExists ||
+                      usernameExists ||
+                      isLoading
+                    }
+                    title={
+                      otpVerified ? undefined : "Please verify OTP to create account"
+                    }
+                    style={{ cursor: otpVerified ? "pointer" : "not-allowed" }}
+                  >
+                    Create Account
+                  </button>
+                </form>
+
+              </div>
+            </div>
           </div>
         </div>
       </div>
+      {notification.open && (
+        <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
+      )}
     </>
   );
 }
+
+
