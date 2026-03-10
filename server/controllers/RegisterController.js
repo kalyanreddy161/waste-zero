@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const { sendVerificationEmail } = require("../services/EmailService");
 
 /* ======================
    CHECK USERNAME EXISTS
@@ -23,9 +24,88 @@ exports.existEmail = async (req, res) => {
     const { email } = req.body;
     const user = await User.findOne({ email });
 
-    res.json({ exists: !!user });
+    // Consider email as "existing" only when the user's profile is completed.
+    const exists = !!user && !!user.isProfileCompleted;
+    res.json({ exists });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+/* ======================
+  send OTP
+====================== */
+exports.sendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const userEmail = email.toLowerCase().trim();
+
+    // Find existing user first
+    let user = await User.findOne({ email: userEmail });
+
+    // generate OTP and expiry AFTER locating the user
+    const otp = await sendVerificationEmail(userEmail);
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    if (!user) {
+      // Create temporary user with default values
+      const hashedTempPassword = await bcrypt.hash("temp_password", 10);
+
+      user = new User({
+        fullName: "temp",
+        username: "temp_" + Date.now(),
+        email: userEmail,
+        password: hashedTempPassword,
+        role: "volunteer", // default valid enum
+        otp: otp,
+        otpExpiresAt: otpExpiry,
+        isProfileCompleted: false
+      });
+    } else {
+      // Update existing user OTP and expiry
+      user.otp = otp;
+      user.otpExpiresAt = otpExpiry;
+    }
+
+    await user.save();
+
+    res.status(200).json({ message: "OTP sent successfully" });
+
+  } catch (error) {
+    console.error("Send OTP error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+/* =====================
+      verification code
+====================== */
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const userEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: userEmail });
+
+    if (!user) {
+      return res.status(400).json({ message: "Email not found" });
+    }
+
+    if (!user.otp || !user.otpExpiresAt) {
+      return res.status(400).json({ message: "OTP not requested" });
+    }
+
+    if (user.otp !== Number(otp)) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    if (user.otpExpiresAt < new Date()) {
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    res.status(200).json({ message: "OTP verified successfully" });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -45,32 +125,45 @@ exports.register = async (req, res) => {
       bio
     } = req.body;
 
+    const userEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: userEmail });
+
+    if (!user) {
+      return res.status(400).json({ message: "Please verify email first" });
+    }
+
+    if (user.isProfileCompleted) {
+      return res.status(400).json({ message: "User already registered" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const userData = {
-      fullName,
-      email,
-      username,
-      password: hashedPassword,
-      role: role.toLowerCase()
-    };
+    // Update fields
+    user.fullName = fullName;
+    user.username = username;
+    user.password = hashedPassword;
+    user.role = role.toLowerCase();
+    user.skills = skills || [];
+    user.bio = bio || "";
 
-    if (skills) userData.skills = skills;
-    if (bio) userData.bio = bio;
-
-    // ✅ Only attach location if valid coordinates exist
     if (
       location &&
       Array.isArray(location.coordinates) &&
       location.coordinates.length === 2
     ) {
-      userData.location = {
+      user.location = {
         type: "Point",
         coordinates: location.coordinates
       };
     }
 
-    const user = new User(userData);
+    user.isProfileCompleted = true;
+
+    // Clear OTP
+    user.otp = undefined;
+    user.otpExpiresAt = undefined;
+
     await user.save();
 
     const userObj = {
@@ -84,7 +177,11 @@ exports.register = async (req, res) => {
     req.session.user = userObj;
     req.session.isAuthenticated = true;
 
-    res.status(201).json({ message: "User registered successfully", user: userObj });
+    res.status(200).json({
+      message: "User registered successfully",
+      user: userObj
+    });
+
   } catch (error) {
     console.error("Register error:", error);
     res.status(500).json({ message: error.message });

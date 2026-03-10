@@ -23,6 +23,11 @@
   min-width: 0;
 }
 
+/* Search wrapper to show icon inside input area */
+.topbar-search-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 680px; }
+.search-icon { width: 18px; height: 18px; opacity: 0.7; margin-left: 6px; }
+.topbar-search { padding-left: 8px; }
+
 .topbar-right { display: flex; align-items: center; gap: 12px; margin-left: 12px; position: relative; flex: 0 0 auto; }
 .icon-btn { background: none; border: none; font-size: 18px; cursor: pointer; }
 .user-circle {
@@ -58,3 +63,13 @@
 .menu-item:hover { background: #eee; }
 .menu-logout { background: #ffecec; color: #b00020; }
 .menu-logout:hover { background: #ffd6d6; }
+
+/* Ensure icon + text are aligned in menu items */
+.menu-item { display: flex; align-items: center; gap: 12px; }
+.menu-icon { width: 20px; height: 20px; object-fit: contain; display: inline-block; }
+
+/* Small screen tweaks to keep popup within viewport */
+@media (max-width: 480px) {
+  .topbar-menu { right: 8px; left: 8px; width: auto; top: 48px; }
+  .menu-item { padding: 10px; }
+}
