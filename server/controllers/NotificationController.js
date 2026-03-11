@@ -45,4 +45,26 @@ const markRead = async (req, res) => {
   }
 };
 
-module.exports = { getNotifications, getUnreadCount, markRead };
+const clearChatNotifications = async (req, res) => {
+  try {
+    const userId = req.session && req.session.user && req.session.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { conversationId } = req.body;
+    if (!conversationId) return res.status(400).json({ message: "conversationId required" });
+
+    const Message = require('../models/Message');
+    // find messages in this conversation
+    const msgs = await Message.find({ conversationId }).select('_id').lean();
+    const ids = msgs.map(m => m._id);
+    if (ids.length === 0) return res.json({ deleted: 0 });
+
+    const result = await Notification.deleteMany({ receiverId: userId, type: 'message', referenceId: { $in: ids } });
+    return res.json({ deleted: result.deletedCount || 0 });
+  } catch (err) {
+    console.error('clearChatNotifications error:', err);
+    return res.status(500).json({ message: 'Failed to clear notifications' });
+  }
+};
+
+module.exports = { getNotifications, getUnreadCount, markRead, clearChatNotifications };

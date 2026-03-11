@@ -8,7 +8,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import MessageBox from "./MessageBox";
 import Loading from "./Loading";
 import MapPicker from "./MapPicker";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import { VolunteerApplicationModal, ApplicationModal } from "./NotificationPanel";
 
 const formatRelativeTime = (iso) => {
@@ -581,6 +581,18 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     }
   };
 
+  const handleContactNgo = async () => {
+    if (!selected || !me) return;
+    const ngo = selected.ngo_id || selected.NGO_ID;
+    const ngoId = (ngo && (ngo._id || ngo)) || null;
+    if (!ngoId) return showMessage('NGO id not available', 'error');
+
+    // Navigate to Messages and open a temporary DM view for this NGO
+    // Do NOT create a conversation in the database yet — it will be created
+    // only when the user sends the first message.
+    navigate('/home/messages', { state: { openConversationOtherUserId: ngoId, openConversationOtherUserName: ngo && (ngo.fullName || ngo.name) } });
+  };
+
   // socket listener: notification (volunteer receives accept/reject)
   useEffect(() => {
     const onNotif = async (notification) => {
@@ -971,7 +983,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                 )}
               </aside>
             </div>
-            {me?.role !== "ngo" && (
+            {me?.role !== "ngo" && !(me?.role === "volunteer" && selected?.status === "closed") && (
               <div className="opps-details-footer-btns">
                 <button
                   className="apply-btn"
@@ -1021,6 +1033,15 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                 >
                   View Location
                 </button>
+                {(isParticipant || (userApp && userApp.status === 'accepted')) && (
+                  <button
+                    className="apply-btn"
+                    type="button"
+                    onClick={handleContactNgo}
+                  >
+                    Contact NGO
+                  </button>
+                )}
               </div>
             )}
 
@@ -1117,7 +1138,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           <div className="opp-applicants-table">
             <div className="opp-applicants-row opp-applicants-heading-row">
               <div className="opp-applicants-col">Applicant Name</div>
-              <div className="opp-applicants-col">Applied On</div>
+              <div className="opp-applicants-col">Applied</div>
               <div className="opp-applicants-col">Status</div>
               <div className="opp-applicants-col">View Details</div>
             </div>

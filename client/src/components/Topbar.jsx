@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLoading } from "../Services/LoadingContext";
 import { useMe, API_BASE } from "../Services/useMe";
 import socket from "../services/socket";
+import pushService from "../services/pushService";
 import NotificationPanel from "./NotificationPanel";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import "../styles/Topbar.css";
@@ -36,6 +37,8 @@ export default function Topbar() {
   const [searchApplications, setSearchApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const searchResultsRef = useRef(null);
+  // Track processed notification <-> message reference IDs to avoid double-counting
+  const processedNotifRefs = useRef(new Set());
 
   const showMessage = (msg, type = "info", duration = 3000) => {
     setNotification({ open: true, message: msg, type, closing: false });
@@ -77,6 +80,28 @@ export default function Topbar() {
     fetchUnread();
   }, [me]);
 
+  // Initialize push subscription and visibility handlers when socket connects
+  useEffect(() => {
+    if (!me) return;
+    if (!socket) return;
+    let cleanupVis = null;
+    const onConnected = async () => {
+      try {
+        // Try subscribe (permission prompt may show)
+        await pushService.subscribeForPush();
+        cleanupVis = pushService.initVisibilityHandlers(socket);
+      } catch (e) { }
+    };
+
+    if (socket.connected) onConnected();
+    socket.on('connect', onConnected);
+
+    return () => {
+      try { socket.off('connect', onConnected); } catch (e) { }
+      try { if (cleanupVis) cleanupVis(); } catch (e) { }
+    };
+  }, [me]);
+
   useEffect(() => {
     const handleOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -94,21 +119,149 @@ export default function Topbar() {
         if (processedIds.has(payload.id)) return;
         processedIds.add(payload.id);
         // keep set size reasonable
-        if (processedIds.size > 50) {
+        if (processedIds.size > 200) {
           const first = processedIds.values().next().value;
           processedIds.delete(first);
         }
       }
+
+      // If this notification references a message id that we've already
+      // processed via receive-message, skip increment to avoid double-count.
+      try {
+        if (payload && payload.referenceId) {
+          if (processedNotifRefs.current.has(String(payload.referenceId))) return;
+          processedNotifRefs.current.add(String(payload.referenceId));
+          if (processedNotifRefs.current.size > 200) {
+            const first = processedNotifRefs.current.values().next().value;
+            processedNotifRefs.current.delete(first);
+          }
+        }
+      } catch (e) { }
+
       setUnread((u) => u + 1);
+      // mark conversation as unread if payload includes conversationId
+      try {
+        const convId = payload && ((payload.meta && payload.meta.conversationId) || payload.conversationId || null);
+        if (convId) {
+          queryClient.setQueryData(['conversations'], (old = []) =>
+            old.map((c) => (String(c._id) === String(convId) ? { ...c, _hasUnread: true } : c))
+          );
+        }
+      } catch (e) { }
       // trigger bell animation via global event
       window.dispatchEvent(new CustomEvent('notify:incoming', { detail: payload }));
     };
     socket.on('notification', onNew);
-
+    // Listen for conversation-level clears (Messages opened a conversation)
+    const onClearConv = (ev) => {
+      try {
+        const convId = ev && ev.detail && ev.detail.conversationId;
+        // Decrease unread count by 1 (minimum 0) and close notifications panel
+        setUnread((u) => Math.max(0, u - 1));
+        // clear per-conversation unread marker
+        try {
+          if (convId) {
+            queryClient.setQueryData(['conversations'], (old = []) =>
+              old.map((c) => (String(c._id) === String(convId) ? { ...c, _hasUnread: false } : c))
+            );
+          }
+        } catch (e) { }
+        setShowNotifications(false);
+      } catch (e) { }
+    };
+    window.addEventListener('notify:clear-conversation', onClearConv);
+    const onClosePanel = () => setShowNotifications(false);
+    window.addEventListener('notify:close-panel', onClosePanel);
     return () => {
       document.removeEventListener("mousedown", handleOutside);
       socket.off('notification', onNew);
+      window.removeEventListener('notify:clear-conversation', onClearConv);
+      window.removeEventListener('notify:close-panel', onClosePanel);
     };
+  }, []);
+
+  // Show on-screen toast (MessageBox) for incoming notifications/messages
+  useEffect(() => {
+    const handler = async (ev) => {
+      const payload = ev && ev.detail ? ev.detail : null;
+      try {
+        if (!payload) return;
+
+        // Notification from server (has .type) or a message object (has sender_id/conversationId)
+        if (payload.type) {
+          if (payload.type === 'application') {
+            // NGO: new application arrived
+            let content = 'New application received';
+            if (payload.application_id) {
+              try {
+                const r = await fetch(`${API_BASE}/applications/${payload.application_id}`, { credentials: 'include' });
+                if (r.ok) {
+                  const app = await r.json();
+                  const t = app.opportunityId && app.opportunityId.title ? app.opportunityId.title : '';
+                  content = `New application for ${t || 'Opportunity'}`;
+                }
+              } catch (e) { }
+            }
+            setNotification({ open: true, message: { title: 'application', content, icon: 'application' }, type: 'info', closing: false });
+          } else if (payload.type === 'accepted' || payload.type === 'rejected') {
+            // Volunteer: NGO responded to application
+            let content = `Your application was ${payload.type}`;
+            if (payload.application_id) {
+              try {
+                const r = await fetch(`${API_BASE}/applications/${payload.application_id}`, { credentials: 'include' });
+                if (r.ok) {
+                  const app = await r.json();
+                  const t = app.opportunityId && app.opportunityId.title ? app.opportunityId.title : '';
+                  content = `your ${t || 'opportunity'} application is ${payload.type}.`;
+                }
+              } catch (e) { }
+            }
+            setNotification({ open: true, message: { title: 'application', content, icon: 'application' }, type: payload.type === 'accepted' ? 'success' : 'error', closing: false });
+          } else if (payload.type === 'message') {
+            // notification referencing a message
+            let senderName = (payload.meta && payload.meta.senderName) || '';
+            let contentText = (payload.meta && payload.meta.message) || '';
+            if (!contentText && payload.referenceId) {
+              try {
+                const r = await fetch(`${API_BASE}/api/chat/messages/${payload.referenceId}`, { credentials: 'include' });
+                if (r.ok) {
+                  const msg = await r.json();
+                  senderName = (msg.sender_id && msg.sender_id.fullName) || senderName || 'Someone';
+                  if (msg.attachments && msg.attachments.length > 0) {
+                    const t = msg.attachments[0].type;
+                    contentText = t === 'image' ? '📷 Photo' : t === 'audio' ? '🎵 Audio' : '📄 File';
+                  } else contentText = msg.content || '';
+                }
+              } catch (e) { }
+            }
+            const content = `${senderName ? senderName + ' : ' : ''}${contentText}`;
+            setNotification({ open: true, message: { title: 'message', content, icon: 'message' }, type: 'info', closing: false });
+          } else {
+            // fallback: show simple text
+            setNotification({ open: true, message: String(payload.meta && payload.meta.message ? payload.meta.message : (payload.message || JSON.stringify(payload))), type: 'info', closing: false });
+          }
+        } else if (payload && (payload.conversationId || payload.sender_id)) {
+          // Direct message object (from receive-message)
+          const sender = payload.sender_id || {};
+          const senderName = sender.fullName || sender.name || (payload.name) || 'Someone';
+          let content = '';
+          if (payload.attachments && payload.attachments.length > 0) {
+            const t = payload.attachments[0].type;
+            content = t === 'image' ? '📷 Photo' : t === 'audio' ? '🎵 Audio' : '📄 File';
+          } else content = payload.content || '';
+          setNotification({ open: true, message: { title: 'message', content: `${senderName} : ${content}`, icon: 'message' }, type: 'info', closing: false });
+        }
+        // auto close
+        window.setTimeout(() => {
+          setNotification((s) => ({ ...s, closing: true }));
+          window.setTimeout(() => setNotification({ open: false, message: "", type: "info", closing: false }), 300);
+        }, 3500);
+      } catch (e) {
+        console.error('notify incoming handler', e);
+      }
+    };
+    window.addEventListener('notify:incoming', handler);
+    return () => window.removeEventListener('notify:incoming', handler);
   }, []);
 
   // Global socket listeners for opportunity create/update/delete
@@ -171,7 +324,7 @@ export default function Topbar() {
         socket.off('opportunity:created', onCreated);
         socket.off('opportunity:updated', onUpdated);
         socket.off('opportunity:deleted', onDeleted);
-      } catch (e) {}
+      } catch (e) { }
       socket.on('opportunity:created', onCreated);
       socket.on('opportunity:updated', onUpdated);
       socket.on('opportunity:deleted', onDeleted);
@@ -180,7 +333,7 @@ export default function Topbar() {
     attachHandlers();
 
     const onConnect = () => attachHandlers();
-    const onDisconnect = () => {};
+    const onDisconnect = () => { };
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
 
@@ -191,7 +344,104 @@ export default function Topbar() {
         socket.off('opportunity:deleted', onDeleted);
         socket.off('connect', onConnect);
         socket.off('disconnect', onDisconnect);
-      } catch (e) {}
+      } catch (e) { }
+    };
+  }, [queryClient]);
+
+  // Global socket listeners for chat events so UI updates even when Messages
+  // component is not mounted. This ensures volunteers/NGOs see incoming chats
+  // and new conversations without having to visit the Messages page.
+  useEffect(() => {
+    const onReceiveMessage = (msg) => {
+      try {
+        const convId = String(msg.conversationId);
+        const sender = msg.sender_id || {};
+        const shapedConv = {
+          _id: convId,
+          type: 'direct',
+          name: sender.fullName || '',
+          username: sender.username || '',
+          otherUserId: sender._id || msg.sender_id,
+          lastMessage: { content: msg.content || (msg.attachments?.[0]?.type === 'image' ? '📷 Photo' : msg.attachments?.[0]?.type === 'audio' ? '🎵 Audio' : '📄 File'), timestamp: msg.timestamp },
+          updatedAt: msg.timestamp,
+        };
+
+        queryClient.setQueryData(['conversations'], (old = []) => {
+          const exists = old.some((c) => String(c._id) === convId);
+          const merged = exists
+            ? old.map((c) => (String(c._id) === convId ? { ...c, ...shapedConv } : c))
+            : [shapedConv, ...old];
+          return merged.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        });
+
+        // Don't increment unread when the user is actively viewing Messages
+        // or when the message belongs to the conversation they're actively
+        // viewing (avoid bell increments while reading the open chat).
+        try {
+          if (typeof window !== 'undefined' && window.__IN_MESSAGES) return;
+          if (typeof window !== 'undefined' && window.__ACTIVE_CONV_ID && String(window.__ACTIVE_CONV_ID) === convId) return;
+        } catch (e) { }
+
+        // Ignore messages originating from myself (multi-tab sender echo)
+        try {
+          const senderId = msg.sender_id && (msg.sender_id._id || msg.sender_id);
+          if (senderId && me && String(senderId) === String(me._id || me.id)) return;
+        } catch (e) { }
+
+        // Notify topbar (unread count) and emit global event for UI badges
+        // If a notification for this same message has already been processed
+        // (or vice-versa), avoid double-incrementing the unread count.
+        try {
+          const mid = String(msg._id || msg.id);
+          if (mid && processedNotifRefs.current.has(mid)) return;
+          if (mid) {
+            processedNotifRefs.current.add(mid);
+            if (processedNotifRefs.current.size > 200) {
+              const first = processedNotifRefs.current.values().next().value;
+              processedNotifRefs.current.delete(first);
+            }
+          }
+        } catch (e) { }
+
+        // mark conversation as having unread messages (used by Messages chat list)
+        try {
+          const convId = String(msg.conversationId);
+          if (convId) {
+            queryClient.setQueryData(['conversations'], (old = []) =>
+              old.map((c) => (String(c._id) === convId ? { ...c, _hasUnread: true } : c))
+            );
+          }
+        } catch (e) { }
+
+        setUnread((u) => u + 1);
+        window.dispatchEvent(new CustomEvent('notify:incoming', { detail: msg }));
+      } catch (e) { console.error('onReceiveMessage error', e); }
+    };
+
+    const onConversationCreated = ({ conversation }) => {
+      try {
+        if (!conversation) return;
+        queryClient.setQueryData(['conversations'], (old = []) => {
+          const exists = old.some((c) => String(c._id) === String(conversation._id));
+          const merged = exists
+            ? old.map((c) => (String(c._id) === String(conversation._id) ? { ...c, ...conversation } : c))
+            : [conversation, ...old];
+          return merged.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        });
+        // bump unread to draw attention (unless user is viewing Messages)
+        if (!window.__IN_MESSAGES) {
+          setUnread((u) => u + 1);
+          window.dispatchEvent(new CustomEvent('notify:incoming', { detail: conversation }));
+        }
+      } catch (e) { console.error('onConversationCreated error', e); }
+    };
+
+    socket.on('receive-message', onReceiveMessage);
+    socket.on('conversation-created', onConversationCreated);
+
+    return () => {
+      socket.off('receive-message', onReceiveMessage);
+      socket.off('conversation-created', onConversationCreated);
     };
   }, [queryClient]);
 
@@ -201,7 +451,7 @@ export default function Topbar() {
       setSearchApplications([]);
       return;
     }
-    
+
     const fetchApplications = async () => {
       setApplicationsLoading(true);
       try {
@@ -209,7 +459,7 @@ export default function Topbar() {
         if (!res.ok) return;
         const data = await res.json();
         const applications = Array.isArray(data) ? data : [];
-        
+
         // Filter applications that match the search input
         const searchLower = searchInput.toLowerCase();
         const filtered = applications.filter((app) => {
@@ -346,9 +596,9 @@ export default function Topbar() {
       <div className="topbar-left">
         <div className="topbar-search-wrapper">
           <img src={searchIcon} alt="Search" className="search-icon" />
-          <input 
-            className="topbar-search" 
-            placeholder="Search pickups, opportunities..." 
+          <input
+            className="topbar-search"
+            placeholder="Search pickups, opportunities..."
             value={searchInput}
             onChange={(e) => {
               const value = e.target.value;
@@ -367,7 +617,7 @@ export default function Topbar() {
 
         {/* Search Results Window */}
         {showSearchResults && (
-          <div 
+          <div
             ref={searchResultsRef}
             className="topbar-search-results"
             onClick={(e) => e.stopPropagation()}
@@ -520,6 +770,8 @@ export default function Topbar() {
                       method: "POST",
                       credentials: "include"
                     });
+                    // Remove push subscription for this device before disconnect
+                    try { await pushService.unsubscribePush(); } catch (e) { }
                     // Disconnect socket so it doesn't reconnect with stale session
                     socket.disconnect();
                     // Clear all cached data on logout

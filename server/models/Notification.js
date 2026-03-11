@@ -19,6 +19,10 @@ const notificationSchema = new mongoose.Schema(
     referenceId: {
       type: mongoose.Schema.Types.ObjectId,
     },
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Conversation",
+    },
     application_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Application",

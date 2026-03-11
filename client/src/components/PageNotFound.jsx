@@ -3,6 +3,16 @@ import styled from 'styled-components';
 
 const Card = () => {
   return (
+    <>
+    <h2 className="logo">
+        <lord-icon
+          src="https://cdn.lordicon.com/zruuduya.json"
+          trigger="hover"
+          colors="primary:#121331,secondary:#08C18A"
+          style={{ width: "34px", height: "34px" }}
+        ></lord-icon>
+        <span className="logo-title">WasteZero</span>
+      </h2>
     <StyledWrapper>
     <div className='page-not-found-container'>
       <div className="card">
@@ -34,6 +44,7 @@ const Card = () => {
       </div>
     </div>
     </StyledWrapper>
+    </>
   );
 }
 

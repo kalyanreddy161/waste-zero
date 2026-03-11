@@ -67,6 +67,8 @@ const opportunitySchema = new mongoose.Schema(
     },
 
     // NOTE: Participants array removed. Participant counts are derived from Application documents.
+
+    // groupId removed — group chat feature deprecated
   },
   { timestamps: true }
 );
