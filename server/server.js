@@ -13,6 +13,8 @@ const opportunitiesRoutes = require("./routes/OpportunitiesRoutes");
 const applicationRoutes = require("./routes/ApplicationRoutes");
 const notificationRoutes = require("./routes/NotificationRoutes");
 const uploadRoutes = require("./routes/UploadRoutes");
+const pickupRoutes = require("./routes/pickupRoutes"); // ✅ added
+const uploadRoutes = require("./routes/UploadRoutes");
 const messageRoutes = require("./routes/MessageRoutes"); // ← NEW
 
 // Chat models used directly in the socket handler
@@ -56,7 +58,7 @@ store.on("error", (error) => {
 });
 
 /* ======================
-   SESSION MIDDLEWARE  ✅ MUST BE BEFORE ROUTES
+   SESSION MIDDLEWARE
 ====================== */
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "secret123",
@@ -86,6 +88,7 @@ app.use(notificationRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api/chat", messageRoutes); // ← NEW: all chat REST endpoints
 // Push subscription endpoints
+app.use("/api/pickups", pickupRoutes); 
 app.use('/api/push', require('./routes/PushRoutes'));
 
 /* ======================
@@ -109,9 +112,16 @@ io.use((socket, next) => {
 // Auth guard — reject sockets that don't have a valid session
 io.use((socket, next) => {
   const req = socket.request;
-  if (req.session && req.session.isAuthenticated && req.session.user && req.session.user.id) {
+
+  if (
+    req.session &&
+    req.session.isAuthenticated &&
+    req.session.user &&
+    req.session.user.id
+  ) {
     return next();
   }
+
   return next(new Error("unauthorized"));
 });
 

@@ -2,10 +2,13 @@ const express = require("express");
 const router = express.Router();
 const Pickup = require("../models/Pickup");
 
-// Create Pickup Request
+/* ======================
+   CREATE PICKUP REQUEST
+====================== */
 router.post("/schedule", async (req, res) => {
   try {
     const pickup = new Pickup(req.body);
+
     await pickup.save();
 
     res.status(201).json({
@@ -14,20 +17,30 @@ router.post("/schedule", async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Pickup scheduling error:", error);
+
     res.status(500).json({
       message: "Error scheduling pickup"
     });
   }
 });
 
-// Get all pickups (for admin panel later)
+/* ======================
+   GET ALL PICKUPS
+   (for admin dashboard)
+====================== */
 router.get("/", async (req, res) => {
   try {
     const pickups = await Pickup.find().sort({ createdAt: -1 });
+
     res.json(pickups);
+
   } catch (error) {
-    res.status(500).json({ message: "Error fetching pickups" });
+    console.error("Error fetching pickups:", error);
+
+    res.status(500).json({
+      message: "Error fetching pickups"
+    });
   }
 });
 
