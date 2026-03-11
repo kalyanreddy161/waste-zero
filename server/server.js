@@ -14,7 +14,6 @@ const applicationRoutes = require("./routes/ApplicationRoutes");
 const notificationRoutes = require("./routes/NotificationRoutes");
 const uploadRoutes = require("./routes/UploadRoutes");
 const pickupRoutes = require("./routes/pickupRoutes"); // ✅ added
-const uploadRoutes = require("./routes/UploadRoutes");
 const messageRoutes = require("./routes/MessageRoutes"); // ← NEW
 
 // Chat models used directly in the socket handler
