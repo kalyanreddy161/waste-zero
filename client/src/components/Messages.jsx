@@ -1,231 +1,124 @@
-import React, { useState, useRef, useEffect } from "react";
+/**
+ * Messages.jsx
+ *
+ * Single-file implementation of the complete chat UI.
+ * Data flow:
+ *   - HTTP (fetch, no axios): load conversations, messages, search users, create groups
+ *   - Socket.IO (existing socket singleton): send/receive/delete messages, typing, presence
+ *   - React Query: cache conversations + messages; invalidate/update on socket events
+ *
+ * UI keeps ALL classes from Messages.css — colors and structure are untouched.
+ */
+
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
+import TypingLoader from './TypingLoader';
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import "../styles/NavbarComponents-styles/Messages.css";
+import socket from "../Services/socket";
+import { useMe, API_BASE } from "../Services/useMe";
+import MessageBox from "./MessageBox";
 
-/* ─────────────── DUMMY DATA ─────────────── */
-const CURRENT_USER = { id: "me", name: "You", initials: "YO" };
+const API = `${API_BASE}/api/chat`;
 
-const DUMMY_CHATS = [
-  {
-    id: "c1",
-    name: "Riya Sharma",
-    initials: "RS",
-    avatarVariant: "",
-    lastMessage: "🎵 Audio",
-    lastMessageType: "audio",
-    time: "15:28",
-    unread: 2,
-    online: true,
-  },
-  {
-    id: "c2",
-    name: "Eco Warriors NGO",
-    initials: "EW",
-    avatarVariant: "secondary",
-    lastMessage: "Thanks for joining the cleanup!",
-    lastMessageType: "text",
-    time: "14:05",
-    unread: 0,
-    online: false,
-  },
-  {
-    id: "c3",
-    name: "Arjun Mehta",
-    initials: "AM",
-    avatarVariant: "accent",
-    lastMessage: "📄 Project_Proposal.pdf",
-    lastMessageType: "doc",
-    time: "11:22",
-    unread: 1,
-    online: true,
-  },
-  {
-    id: "c4",
-    name: "WasteZero Team",
-    initials: "WZ",
-    avatarVariant: "secondary",
-    lastMessage: "📷 Photo",
-    lastMessageType: "image",
-    time: "Yesterday",
-    unread: 0,
-    online: false,
-  },
-  {
-    id: "c5",
-    name: "Priya Patel",
-    initials: "PP",
-    avatarVariant: "",
-    lastMessage: "See you at the event!",
-    lastMessageType: "text",
-    time: "Yesterday",
-    unread: 0,
-    online: false,
-  },
-];
+/* ─── helpers ─── */
+const fetcher = (url) =>
+  fetch(url, { credentials: "include" }).then((r) => {
+    if (!r.ok) throw new Error("fetch failed");
+    return r.json();
+  });
 
-const DUMMY_SEARCH_USERS = [
-  { id: "u1", name: "Rahul Kumar", initials: "RK", avatarVariant: "secondary", role: "Volunteer" },
-  { id: "u2", name: "Sneha Reddy", initials: "SR", avatarVariant: "", role: "NGO Admin" },
-  { id: "u3", name: "Mohammed Ali", initials: "MA", avatarVariant: "accent", role: "Volunteer" },
-];
+function fmtTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
-const DUMMY_MESSAGES = {
-  c1: [
-    {
-      id: "m1",
-      senderId: "other",
-      type: "text",
-      content: "Hey! Did you see the event update? 🌿",
-      time: "14:50",
-    },
-    {
-      id: "m2",
-      senderId: "me",
-      type: "text",
-      content: "Yes! I just registered. Super excited about the clean-up drive 🎉",
-      time: "14:52",
-    },
-    {
-      id: "m3",
-      senderId: "other",
-      type: "image",
-      content: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
-      fileName: "cleanup_poster.jpg",
-      time: "14:55",
-    },
-    {
-      id: "m4",
-      senderId: "me",
-      type: "text",
-      content: "Wow, looks amazing! Sharing this with the team right away.",
-      time: "14:57",
-    },
-    {
-      id: "m5",
-      senderId: "other",
-      type: "audio",
-      content: "https://ik.imagekit.io/demo/sample-audio.mp3",
-      duration: "0:15",
-      time: "15:10",
-    },
-    {
-      id: "m6",
-      senderId: "me",
-      type: "doc",
-      content: "https://example.com/volunteer_guide.pdf",
-      fileName: "Volunteer_Guide.pdf",
-      fileSize: "1.2 MB",
-      time: "15:20",
-    },
-    {
-      id: "m7",
-      senderId: "other",
-      type: "text",
-      content: "Perfect, see you there! 👋",
-      time: "15:28",
-    },
-  ],
-  c2: [
-    {
-      id: "m1",
-      senderId: "other",
-      type: "text",
-      content: "Welcome to Eco Warriors! Glad to have you onboard.",
-      time: "Yesterday",
-    },
-    {
-      id: "m2",
-      senderId: "me",
-      type: "text",
-      content: "Thank you! Looking forward to contributing.",
-      time: "Yesterday",
-    },
-    {
-      id: "m3",
-      senderId: "other",
-      type: "text",
-      content: "Thanks for joining the cleanup!",
-      time: "14:05",
-    },
-  ],
-  c3: [
-    {
-      id: "m1",
-      senderId: "other",
-      type: "doc",
-      content: "https://example.com/project_proposal.pdf",
-      fileName: "Project_Proposal.pdf",
-      fileSize: "3.5 MB",
-      time: "11:22",
-    },
-    {
-      id: "m2",
-      senderId: "me",
-      type: "text",
-      content: "Got the document, will review and get back to you!",
-      time: "11:25",
-    },
-  ],
-  c4: [
-    {
-      id: "m1",
-      senderId: "other",
-      type: "image",
-      content: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=600&q=80",
-      fileName: "team_photo.jpg",
-      time: "Yesterday",
-    },
-  ],
-  c5: [
-    {
-      id: "m1",
-      senderId: "me",
-      type: "text",
-      content: "Looking forward to the event!",
-      time: "Yesterday",
-    },
-    {
-      id: "m2",
-      senderId: "other",
-      type: "text",
-      content: "See you at the event!",
-      time: "Yesterday",
-    },
-  ],
-};
+/* ─── Date helpers ─── */
+function stripDate(ts) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
 
-/* ─────────────── SUB-COMPONENTS ─────────────── */
+function formatDateLabel(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
 
-/* Avatar */
-function Avatar({ initials, variant = "", size = 46 }) {
+  const isToday = stripDate(d) === stripDate(today);
+  const isYesterday = stripDate(d) === stripDate(yesterday);
+
+  if (isToday) return "Today";
+  if (isYesterday) return "Yesterday";
+
+  // DD-MM-YYYY
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+}
+
+function initials(name = "") {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+/* ─── Avatar ─── */
+function Avatar({ name = "", size = 46 }) {
+  const variants = ["", "secondary", "accent"];
+  const idx = name.charCodeAt(0) % variants.length;
+  const variant = variants[idx];
   return (
     <div
       className={`msg-chat-avatar${variant ? ` ${variant}` : ""}`}
       style={{ width: size, height: size, fontSize: size * 0.37 }}
     >
-      {initials}
+      {initials(name)}
     </div>
   );
 }
 
-/* ─── Chat list item ─── */
-function ChatItem({ chat, isActive, onClick }) {
-  const previewIcon =
-    chat.lastMessageType === "audio"
-      ? "🎵 "
-      : chat.lastMessageType === "image"
-        ? "📷 "
-        : chat.lastMessageType === "doc"
-          ? "📄 "
-          : "";
+/* ─── DateSeparator ─── */
+function DateSeparator({ label }) {
+  return (
+    <div className="msg-date-divider">
+      <span>{label}</span>
+    </div>
+  );
+}
 
+
+
+/* ─────────────────────────────────────────────
+   ChatItem
+───────────────────────────────────────────── */
+function ChatItem({ conv, isActive, onClick, onlineUsers, typingUsers }) {
+  const isOnline = onlineUsers.has(conv.otherUserId);
+  const preview = conv.lastMessage?.content || "No messages yet";
+  const isTyping = typingUsers && typingUsers[conv._id];
   return (
     <div
       className={`msg-chat-item${isActive ? " active" : ""}`}
-      onClick={() => onClick(chat)}
+      onClick={() => onClick(conv)}
     >
       <div style={{ position: "relative" }}>
-        <Avatar initials={chat.initials} variant={chat.avatarVariant} />
-        {chat.online && (
+        <Avatar name={conv.name} />
+        {conv.type === "direct" && isOnline && (
           <span
             style={{
               position: "absolute",
@@ -241,80 +134,258 @@ function ChatItem({ chat, isActive, onClick }) {
         )}
       </div>
       <div className="msg-chat-info">
-        <div className="msg-chat-name">{chat.name}</div>
-        <div className="msg-chat-preview">
-          <span className="preview-icon">{previewIcon}</span>
-          {chat.lastMessage.replace(/^[🎵📷📄]\s*/, "")}
-        </div>
+        <div className="msg-chat-name">{conv.name}</div>
+        <div className="msg-chat-preview">{isTyping ? <TypingLoader /> : preview}</div>
       </div>
       <div className="msg-chat-meta">
-        <span className="msg-chat-time">{chat.time}</span>
-        {chat.unread > 0 && (
-          <span className="msg-unread-badge">{chat.unread}</span>
+        {conv._hasUnread && (
+          <span
+            title="New messages"
+            style={{
+              display: "inline-block",
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: "#08C18A",
+              marginRight: 8,
+              verticalAlign: "middle",
+            }}
+          />
         )}
+        <span className="msg-chat-time">
+          {fmtTime(conv.lastMessage?.timestamp || conv.updatedAt)}
+        </span>
       </div>
     </div>
   );
 }
 
-/* ─── Text Message ─── */
-function TextMessage({ msg, isSent, onDelete }) {
+
+
+
+/* ─────────────────────────────────────────────
+   MessageRow — renders one message with the dropdown
+───────────────────────────────────────────── */
+function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef();
 
   useEffect(() => {
     const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target))
+        setOpen(false);
     };
     if (open) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  const hasAttachments = msg.attachments && msg.attachments.length > 0;
+  const att = hasAttachments ? msg.attachments[0] : null;
+
   return (
     <div className={`msg-row ${isSent ? "sent" : "received"} msg-fade-in`}>
-      {!isSent && (
-        <div className="msg-row-avatar">
-          {DUMMY_CHATS.find(() => true)?.initials?.slice(0, 2) || "U"}
-        </div>
-      )}
+      {/* avatar removed for received messages as per UI update */}
       <div className="msg-bubble-wrap">
-        <div className="msg-bubble">
-          {msg.content}
-          {/* Dropdown arrow */}
-          <button
-            className="msg-dropdown-trigger"
-            onClick={() => setOpen((v) => !v)}
-            title="Options"
-          >
-            <DownArrowIcon />
-          </button>
-          {/* Dropdown menu */}
-          {open && (
-            <div className="msg-dropdown-menu" ref={menuRef}>
-              {isSent && (
-                <button
-                  className="msg-dropdown-item danger"
-                  onClick={() => { setOpen(false); onDelete(msg.id); }}
-                >
-                  <TrashIcon /> Delete
-                </button>
-              )}
-              {!isSent && (
-                <button
-                  className="msg-dropdown-item"
-                  onClick={() => setOpen(false)}
-                >
-                  <CopyIcon /> Copy
-                </button>
+        <div className="msg-item-container">
+          {isSent && (
+            <div className="msg-action" ref={menuRef}>
+              <button
+                className="msg-action-btn"
+                title="Options"
+                onClick={() => setOpen((v) => !v)}
+              >
+                <DotsIcon />
+              </button>
+
+              {open && (
+                <div className="msg-dropdown-menu">
+                  {att?.type === "image" && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        downloadFile(att.url, att.fileName || "image.jpg");
+                        setOpen(false);
+                        showNotification("Image downloaded", "success");
+                      }}
+                    >
+                      <DownloadIcon /> Download Image
+                    </button>
+                  )}
+                  {att?.type === "file" && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        downloadFile(att.url, att.fileName || "document");
+                        setOpen(false);
+                        showNotification("File downloaded", "success");
+                      }}
+                    >
+                      <DownloadIcon /> Download File
+                    </button>
+                  )}
+                  {att?.type === "audio" && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        downloadFile(att.url, att.fileName || "audio.mp3");
+                        setOpen(false);
+                        showNotification("Audio downloaded", "success");
+                      }}
+                    >
+                      <DownloadIcon /> Download Audio
+                    </button>
+                  )}
+
+                  {msg.content && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content)
+                          .then(() => showNotification("Copied to clipboard", "success"))
+                          .catch(() => showNotification("Copy failed", "error"));
+                        setOpen(false);
+                      }}
+                    >
+                      <CopyIcon /> Copy
+                    </button>
+                  )}
+
+                  {isSent && (
+                    <button
+                      className="msg-dropdown-item danger"
+                      onClick={() => {
+                        setOpen(false);
+                        onDelete(msg._id);
+                      }}
+                    >
+                      <TrashIcon /> Delete
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
+
+          <div className={`msg-content`}>
+            <div
+              className={`msg-bubble${hasAttachments && !msg.content ? " media-bubble" : ""}`}
+              style={hasAttachments && !msg.content ? { padding: 0, background: "none", boxShadow: "none" } : {}}
+            >
+              {/* Content */}
+              {att?.type === "image" && (
+                <ImageAttachment url={att.url} fileName={att.fileName} />
+              )}
+              {att?.type === "audio" && <AudioAttachment url={att.url} isSent={isSent} />}
+              {att?.type === "file" && (
+                <DocAttachment
+                  url={att.url}
+                  fileName={att.fileName}
+                  size={att.size}
+                  isSent={isSent}
+                />
+              )}
+              {msg.content && <span>{msg.content}</span>}
+            </div>
+          </div>
+
+          {!isSent && (
+            <div className="msg-action" ref={menuRef}>
+              <button
+                className="msg-action-btn"
+                title="Options"
+                onClick={() => setOpen((v) => !v)}
+              >
+                <DotsIcon />
+              </button>
+
+              {open && (
+                <div className="msg-dropdown-menu">
+                  {att?.type === "image" && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        downloadFile(att.url, att.fileName || "image.jpg");
+                        setOpen(false);
+                        showNotification("Image downloaded", "success");
+                      }}
+                    >
+                      <DownloadIcon /> Download Image
+                    </button>
+                  )}
+                  {att?.type === "file" && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        downloadFile(att.url, att.fileName || "document");
+                        setOpen(false);
+                        showNotification("File downloaded", "success");
+                      }}
+                    >
+                      <DownloadIcon /> Download File
+                    </button>
+                  )}
+                  {att?.type === "audio" && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        downloadFile(att.url, att.fileName || "audio.mp3");
+                        setOpen(false);
+                        showNotification("Audio downloaded", "success");
+                      }}
+                    >
+                      <DownloadIcon /> Download Audio
+                    </button>
+                  )}
+
+                  {msg.content && (
+                    <button
+                      className="msg-dropdown-item"
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content)
+                          .then(() => showNotification("Copied to clipboard", "success"))
+                          .catch(() => showNotification("Copy failed", "error"));
+                        setOpen(false);
+                      }}
+                    >
+                      <CopyIcon /> Copy
+                    </button>
+                  )}
+
+                  {isSent && (
+                    <button
+                      className="msg-dropdown-item danger"
+                      onClick={() => {
+                        setOpen(false);
+                        onDelete(msg._id);
+                      }}
+                    >
+                      <TrashIcon /> Delete
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
+
+        {/* Timestamp + status */}
         <div className="msg-bubble-time">
-          {msg.time}
-          {isSent && (
-            <span className="msg-ticks read">
-              <CheckDoubleIcon />
+          {fmtTime(msg.timestamp)}
+          {isSent && isLastSent && (
+            <span
+              style={{
+                fontSize: 10,
+                marginLeft: 4,
+                color: "#333",
+                fontWeight: 600,
+              }}
+            >
+              {msg.status === "seen"
+                ? "seen"
+                : msg.status === "delivered"
+                  ? "delivered"
+                  : "sent"}
             </span>
           )}
         </div>
@@ -323,91 +394,21 @@ function TextMessage({ msg, isSent, onDelete }) {
   );
 }
 
-/* ─── Image Message ─── */
-function ImageMessage({ msg, isSent, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef();
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = msg.content;
-    link.download = msg.fileName || "image.jpg";
-    link.target = "_blank";
-    link.click();
-  };
-
+/* ─── Image Attachment ─── */
+function ImageAttachment({ url, fileName }) {
   return (
-    <div className={`msg-row ${isSent ? "sent" : "received"} msg-fade-in`}>
-      {!isSent && <div className="msg-row-avatar">UC</div>}
-      <div className="msg-bubble-wrap">
-        <div className="msg-bubble media-bubble" style={{ padding: 0, background: "none", boxShadow: "none" }}>
-          <div className="msg-image-wrap">
-            <img src={msg.content} alt={msg.fileName || "image"} />
-            {/* Hover overlay with download */}
-            <div className="msg-image-overlay">
-              <button onClick={handleDownload}>
-                <DownloadIcon /> Download
-              </button>
-            </div>
-          </div>
-          {/* Dropdown */}
-          <button
-            className="msg-dropdown-trigger"
-            onClick={() => setOpen((v) => !v)}
-            title="Options"
-            style={{ position: "absolute", top: 6, right: isSent ? "auto" : -28, left: isSent ? -28 : "auto" }}
-          >
-            <DownArrowIcon />
-          </button>
-          {open && (
-            <div className="msg-dropdown-menu" ref={menuRef}>
-              <button className="msg-dropdown-item" onClick={() => { handleDownload(); setOpen(false); }}>
-                <DownloadIcon /> Download
-              </button>
-              {isSent && (
-                <button
-                  className="msg-dropdown-item danger"
-                  onClick={() => { setOpen(false); onDelete(msg.id); }}
-                >
-                  <TrashIcon /> Delete
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="msg-bubble-time">
-          {msg.time}
-          {isSent && <span className="msg-ticks read"><CheckDoubleIcon /></span>}
-        </div>
-      </div>
+    <div className="msg-image-wrap">
+      <img src={url} alt={fileName || "image"} onClick={() => window.dispatchEvent(new CustomEvent('open-image-modal', { detail: { url, fileName } }))} style={{ cursor: 'zoom-in' }} />
     </div>
   );
 }
 
-/* ─── Audio Message ─── */
-function AudioMessage({ msg, isSent, onDelete }) {
+/* ─── Audio Attachment ─── */
+function AudioAttachment({ url, isSent }) {
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [progress, setProgress] = useState(35);
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef();
+  const [progress, setProgress] = useState(0);
   const audioRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -421,7 +422,8 @@ function AudioMessage({ msg, isSent, onDelete }) {
 
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
-    const pct = (audioRef.current.currentTime / (audioRef.current.duration || 1)) * 100;
+    const pct =
+      (audioRef.current.currentTime / (audioRef.current.duration || 1)) * 100;
     setProgress(pct);
   };
 
@@ -429,253 +431,880 @@ function AudioMessage({ msg, isSent, onDelete }) {
     if (!audioRef.current || !audioRef.current.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pct = x / rect.width;
-    audioRef.current.currentTime = pct * audioRef.current.duration;
+    audioRef.current.currentTime =
+      (x / rect.width) * audioRef.current.duration;
   };
 
   return (
-    <div className={`msg-row ${isSent ? "sent" : "received"} msg-fade-in`}>
-      {!isSent && <div className="msg-row-avatar">UC</div>}
-      <div className="msg-bubble-wrap">
-        <div className="msg-bubble">
-          <audio
-            ref={audioRef}
-            src={msg.content}
-            muted={muted}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setPlaying(false)}
-            style={{ display: "none" }}
-          />
-          <div className="msg-audio-player">
-            <button className="msg-audio-play-btn" onClick={togglePlay} title={playing ? "Pause" : "Play"}>
-              {playing ? <PauseIcon /> : <PlayIcon />}
-            </button>
-            <div className="msg-audio-controls">
-              <div
-                className="msg-audio-progress"
-                onClick={handleProgressClick}
-                title="Seek"
-              >
-                <div className="msg-audio-filled" style={{ width: `${progress}%` }} />
-              </div>
-              <div className="msg-audio-bottom">
-                <span className="msg-audio-time-info">0:15</span>
-                <button
-                  className="msg-audio-mute-btn"
-                  onClick={() => setMuted((v) => !v)}
-                  title={muted ? "Unmute" : "Mute"}
-                >
-                  {muted ? <MuteIcon /> : <VolumeIcon />}
-                </button>
-              </div>
-            </div>
-          </div>
-          {/* Dropdown */}
-          <button
-            className="msg-dropdown-trigger"
-            onClick={() => setOpen((v) => !v)}
-            title="Options"
-          >
-            <DownArrowIcon />
-          </button>
-          {open && (
-            <div className="msg-dropdown-menu" ref={menuRef}>
-              {isSent && (
-                <button
-                  className="msg-dropdown-item danger"
-                  onClick={() => { setOpen(false); onDelete(msg.id); }}
-                >
-                  <TrashIcon /> Delete
-                </button>
-              )}
-              {!isSent && (
-                <button className="msg-dropdown-item" onClick={() => setOpen(false)}>
-                  <DownloadIcon /> Download
-                </button>
-              )}
-            </div>
-          )}
+    <div className="msg-audio-player">
+      <audio
+        ref={audioRef}
+        src={url}
+        muted={muted}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={() => { setPlaying(false); setProgress(0); }}
+        style={{ display: "none" }}
+      />
+      <button className="msg-audio-play-btn" onClick={togglePlay}>
+        {playing ? <PauseIcon /> : <PlayIcon />}
+      </button>
+      <div className="msg-audio-controls">
+        <div className="msg-audio-progress" onClick={handleProgressClick}>
+          <div className="msg-audio-filled" style={{ width: `${progress}%` }} />
         </div>
-        <div className="msg-bubble-time">
-          {msg.time}
-          {isSent && <span className="msg-ticks read"><CheckDoubleIcon /></span>}
+        <div className="msg-audio-bottom">
+          <span className="msg-audio-time-info">
+            {audioRef.current?.duration
+              ? `${Math.floor(audioRef.current.currentTime)}s / ${Math.floor(audioRef.current.duration)}s`
+              : ""}
+          </span>
+          <button
+            className="msg-audio-mute-btn"
+            onClick={() => setMuted((v) => !v)}
+          >
+            {muted ? <MuteIcon /> : <VolumeIcon />}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ─── Document Message ─── */
-function DocMessage({ msg, isSent, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef();
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = msg.content;
-    link.download = msg.fileName || "document";
-    link.target = "_blank";
-    link.click();
-  };
-
+/* ─── Document Attachment ─── */
+function DocAttachment({ url, fileName, size, isSent }) {
+  const fmtSize = size
+    ? size > 1048576
+      ? `${(size / 1048576).toFixed(1)} MB`
+      : `${(size / 1024).toFixed(0)} KB`
+    : "";
   return (
-    <div className={`msg-row ${isSent ? "sent" : "received"} msg-fade-in`}>
-      {!isSent && <div className="msg-row-avatar">UC</div>}
-      <div className="msg-bubble-wrap">
-        <div className="msg-bubble">
-          <div className="msg-doc-box">
-            <div className="msg-doc-icon">
-              <DocIcon />
-            </div>
-            <div className="msg-doc-info">
-              <div className="msg-doc-name">{msg.fileName || "Document"}</div>
-              <div className="msg-doc-size">{msg.fileSize || "—"}</div>
-            </div>
-            <button
-              className="msg-doc-dl-btn"
-              onClick={handleDownload}
-              title="Download"
-            >
-              <DownloadIcon />
-            </button>
-          </div>
-          {/* Dropdown */}
-          <button
-            className="msg-dropdown-trigger"
-            onClick={() => setOpen((v) => !v)}
-            title="Options"
-          >
-            <DownArrowIcon />
-          </button>
-          {open && (
-            <div className="msg-dropdown-menu" ref={menuRef}>
-              <button className="msg-dropdown-item" onClick={() => { handleDownload(); setOpen(false); }}>
-                <DownloadIcon /> Download
-              </button>
-              {isSent && (
-                <button
-                  className="msg-dropdown-item danger"
-                  onClick={() => { setOpen(false); onDelete(msg.id); }}
-                >
-                  <TrashIcon /> Delete
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="msg-bubble-time">
-          {msg.time}
-          {isSent && <span className="msg-ticks read"><CheckDoubleIcon /></span>}
-        </div>
+    <div className="msg-doc-box">
+      <div className="msg-doc-icon">
+        <DocIcon />
       </div>
+      <div className="msg-doc-info">
+        <div className="msg-doc-name">{fileName || "Document"}</div>
+        {fmtSize && <div className="msg-doc-size">{fmtSize}</div>}
+      </div>
+      <button
+        className="msg-doc-dl-btn"
+        onClick={() => downloadFile(url, fileName || "document")}
+        title="Download"
+      >
+        <DownloadIcon />
+      </button>
     </div>
   );
 }
 
-/* ─────────────── MAIN COMPONENT ─────────────── */
+/* ─── download helper ─── */
+function downloadFile(url, fileName) {
+  try {
+    fetch(url, { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error('fetch-failed');
+        return res.blob();
+      })
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName || '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      })
+      .catch(() => {
+        try { window.open(url, '_blank'); } catch (e) { /* ignore */ }
+      });
+  } catch (e) {
+    try { window.open(url, '_blank'); } catch (err) { /* ignore */ }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════════ */
 const Messages = () => {
-  const [activeChat, setActiveChat] = useState(null);
-  const [messages, setMessages] = useState({});
+  const { data: me } = useMe();
+  const myId = me?._id || me?.id || "";
+  const queryClient = useQueryClient();
+  const location = useLocation();
+
+  const [activeConv, setActiveConv] = useState(null); // full conversation object
   const [inputText, setInputText] = useState("");
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [typingUsers, setTypingUsers] = useState({}); // conversationId → true/false
+  const [isTyping, setIsTyping] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef(null);
+  const headerMenuButtonRef = useRef(null);
+  const [attachmentPending, setAttachmentPending] = useState(null); // { url, fileName, fileType, size }
+  const [uploading, setUploading] = useState(false);
+  const [notification, setNotification] = useState({ open: false, message: "", type: "info", closing: false });
+  const [imageModal, setImageModal] = useState({ open: false, url: "", fileName: "" });
+  const [manualSeparators, setManualSeparators] = useState({}); // { convId: Set<dateStr> }
+  const typingTimer = useRef(null);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const preserveScrollRef = useRef({ active: false, prevScrollHeight: 0, prevScrollTop: 0 });
+  const shouldScrollRef = useRef(true);
+  const prevPagesCountRef = useRef(0);
+  const prevMessagesLenRef = useRef(0);
 
-  /* Load messages when chat changes */
+  // Announce presence: user is viewing the Messages page
   useEffect(() => {
-    if (activeChat) {
-      setMessages((prev) => ({
-        ...prev,
-        [activeChat.id]: DUMMY_MESSAGES[activeChat.id] || [],
-      }));
-    }
-  }, [activeChat]);
+    try {
+      socket.emit("presence:in-messages", true);
+      window.__IN_MESSAGES = true;
+    } catch (e) {}
+    return () => {
+      try {
+        socket.emit("presence:in-messages", false);
+        window.__IN_MESSAGES = false;
+      } catch (e) {}
+    };
+  }, []);
 
-  /* Scroll to bottom */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, activeChat]);
+    const onOpenImage = (e) => {
+      const d = e && e.detail ? e.detail : null;
+      if (!d || !d.url) return;
+      setImageModal({ open: true, url: d.url, fileName: d.fileName || "" });
+    };
+    window.addEventListener('open-image-modal', onOpenImage);
+    return () => window.removeEventListener('open-image-modal', onOpenImage);
+  }, []);
 
-  /* ── Search users ── */
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
+    const onKey = (e) => {
+      if (e.key === 'Escape' && imageModal.open) setImageModal({ open: false, url: "", fileName: "" });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [imageModal.open]);
+
+  // Expose the currently-open conversation globally so other UI (Topbar)
+  // can suppress notifications for messages that belong to the open chat.
+  useEffect(() => {
+    try {
+      if (activeConv && activeConv._id) window.__ACTIVE_CONV_ID = String(activeConv._id);
+      else window.__ACTIVE_CONV_ID = null;
+    } catch (e) {}
+    return () => {
+      try {
+        window.__ACTIVE_CONV_ID = null;
+      } catch (e) {}
+    };
+  }, [activeConv && activeConv._id]);
+
+  /* ────────── React Query: Conversations ────────── */
+  const { data: conversations = [], refetch: refetchConvs } = useQuery({
+    queryKey: ["conversations"],
+    queryFn: () => fetcher(`${API}/conversations`),
+    staleTime: 30_000,
+  });
+
+  // On mount / when conversations load, fetch existing message notifications
+  // so we can mark conversations that already have unread messages.
+  useEffect(() => {
+    const markUnreadFromNotifications = async () => {
+      try {
+        const base = API.split('/api')[0];
+        const res = await fetch(`${base}/notifications`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+        const convIds = new Set(
+          data.filter((n) => n.type === 'message' && n.conversationId).map((n) => String(n.conversationId))
+        );
+        if (convIds.size > 0) {
+          queryClient.setQueryData(["conversations"], (old = []) =>
+            old.map((c) => (convIds.has(String(c._id)) ? { ...c, _hasUnread: true } : c))
+          );
+        }
+      } catch (e) {}
+    };
+    markUnreadFromNotifications();
+  }, [conversations.length]);
+
+  /* ────────── React Query: Messages ────────── */
+  const {
+    data,
+    fetchNextPage,
+    isFetchingNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["messages", activeConv?._id],
+    queryFn: async ({ pageParam = null }) => {
+      if (!activeConv) return [];
+      const url = `${API}/messages?conversationId=${activeConv._id}&limit=25${pageParam ? `&cursor=${pageParam}` : ""}`;
+      return fetcher(url);
+    },
+    enabled: !!activeConv,
+    staleTime: Infinity,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.length === 0) return undefined;
+      return lastPage[0]?.timestamp || undefined;
+    },
+    initialPageParam: null,
+  });
+
+  // Expose a flat messages array for the UI (must remain a flat array)
+  const messages = data?.pages?.flatMap((page) => page) ?? [];
+
+  /* ────────── User Search ────────── */
+  const { data: searchResults = [] } = useQuery({
+    queryKey: ["userSearch", searchQuery],
+    queryFn: () =>
+      searchQuery.trim().length >= 1
+        ? fetcher(`${API}/users/search?q=${encodeURIComponent(searchQuery)}`)
+        : [],
+    enabled: searchQuery.trim().length >= 1,
+    staleTime: 10_000,
+  });
+
+  /* ────────── Scroll to bottom on new messages ────────── */
+  useEffect(() => {
+    const area = messagesEndRef.current && messagesEndRef.current.parentElement;
+
+    // If we're preserving scroll (loading older messages), keep user's view
+    if (preserveScrollRef.current.active && area) {
+      const newH = area.scrollHeight;
+      const delta = newH - preserveScrollRef.current.prevScrollHeight;
+      area.scrollTop = preserveScrollRef.current.prevScrollTop + delta;
+      preserveScrollRef.current.active = false;
+      // update prevMessagesLen to current to avoid accidental autoscroll
+      prevMessagesLenRef.current = messages.length;
       return;
     }
-    // Simulate API search
-    const filtered = DUMMY_SEARCH_USERS.filter((u) =>
-      u.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setSearchResults(filtered);
-  }, [searchQuery]);
 
-  /* ── Select chat ── */
-  const handleSelectChat = (chat) => {
-    setActiveChat(chat);
-  };
+    const prevLen = prevMessagesLenRef.current || 0;
+    const currLen = messages.length;
 
-  /* ── Select from search ── */
-  const handleSelectSearchUser = (user) => {
-    const newChat = {
-      id: user.id,
-      name: user.name,
-      initials: user.initials,
-      avatarVariant: user.avatarVariant,
-      lastMessage: "Start a conversation",
-      lastMessageType: "text",
-      time: "Now",
-      unread: 0,
-      online: true,
+    // Decide whether to scroll and which behavior to use.
+    // - when opening a conversation we set shouldScrollRef.current === 'auto'
+    //   so the jump to bottom is instant (no long smooth animation)
+    // - when new messages arrive (currLen > prevLen) use smooth scrolling
+    // - when some code set shouldScrollRef.current === true, use smooth
+    try {
+      let doScroll = false;
+      let behavior = "smooth";
+
+      if (shouldScrollRef.current === "auto") {
+        doScroll = true;
+        behavior = "auto";
+      } else if (shouldScrollRef.current === true) {
+        doScroll = true;
+        behavior = "smooth";
+      } else if (currLen > prevLen) {
+        doScroll = true;
+        behavior = "smooth";
+      }
+
+      if (doScroll) {
+        messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+      }
+    } catch (e) {}
+    // reset to default (no auto-scroll) after handling
+    shouldScrollRef.current = false;
+
+    prevMessagesLenRef.current = currLen;
+  }, [messages.length, activeConv && activeConv._id]);
+
+  // When opening/selecting a conversation, request an instant jump to bottom
+  // (avoid long smooth animation when there are many messages).
+  useEffect(() => {
+    try {
+      shouldScrollRef.current = "auto";
+    } catch (e) {}
+  }, [activeConv && activeConv._id]);
+
+  /* ────────── Scroll when typing indicator appears ────────── */
+  useEffect(() => {
+    try {
+      if (!activeConv) return;
+      const isTyping = !!typingUsers[activeConv._id];
+      if (isTyping) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    } catch (e) {}
+  }, [typingUsers, activeConv && activeConv._id]);
+
+  /*
+    Ensure infinite-query pages are ordered oldest -> newest.
+    useInfiniteQuery appends fetched pages to the end; when fetching older
+    pages we want them at the beginning so flatMap yields oldest..newest.
+    Detect when a new page was added (pages length increased) and rotate
+    the last page to the front. This preserves the newest page as the last
+    element so socket appends (which push to last page) still place new
+    messages at the bottom.
+  */
+  useEffect(() => {
+    try {
+      if (!activeConv || !data || !data.pages) {
+        prevPagesCountRef.current = 0;
+        return;
+      }
+      const key = ["messages", activeConv._id];
+      const currCount = data.pages.length;
+      const prevCount = prevPagesCountRef.current || 0;
+      if (currCount > prevCount) {
+        // A new page was added — rotate the last page to the front unless
+        // there is only one page.
+        const old = queryClient.getQueryData(key);
+        if (!old) {
+          prevPagesCountRef.current = currCount;
+          return;
+        }
+        const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+        if (!norm.pages || norm.pages.length < 2) {
+          prevPagesCountRef.current = norm.pages ? norm.pages.length : 0;
+          return;
+        }
+        const lastIdx = norm.pages.length - 1;
+        const lastPage = norm.pages[lastIdx];
+        const lastParam = norm.pageParams ? norm.pageParams[lastIdx] : undefined;
+        const pages = [lastPage, ...norm.pages.slice(0, lastIdx)];
+        const pageParams = norm.pageParams ? [lastParam, ...norm.pageParams.slice(0, lastIdx)] : undefined;
+        queryClient.setQueryData(key, (oldVal) => ({ ...(Array.isArray(oldVal) ? { pages: [oldVal], pageParams: [null] } : oldVal), pages, pageParams }));
+        prevPagesCountRef.current = pages.length;
+      } else {
+        prevPagesCountRef.current = currCount;
+      }
+    } catch (e) {
+      prevPagesCountRef.current = data && data.pages ? data.pages.length : 0;
+    }
+  }, [data?.pages?.length, activeConv && activeConv._id]);
+
+  /* ────────── Ensure fresh messages are loaded when opening a conversation ────────── */
+  useEffect(() => {
+    try {
+      if (!activeConv || !activeConv._id) return;
+      // Invalidate cached messages for this conversation so React Query
+      // fetches the latest messages that may have arrived while the user
+      // was not on the Messages page.
+      queryClient.invalidateQueries(["messages", String(activeConv._id)]);
+    } catch (e) {}
+  }, [activeConv && activeConv._id]);
+
+  /* ────────── Mark messages seen when opening/switching conversations ────────── */
+  useEffect(() => {
+    if (!activeConv) return;
+    try {
+      socket.emit("message-seen", { conversationId: activeConv._id });
+      // Inform other UI (Topbar) to clear notifications for this conversation
+      window.dispatchEvent(new CustomEvent("notify:clear-conversation", { detail: { conversationId: String(activeConv._id) } }));
+      // Clear persisted notifications for this conversation on the server
+      try {
+        const base = API.split('/api')[0];
+        fetch(`${base}/notifications/clear-chat`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: String(activeConv._id) }),
+        }).catch(() => {});
+      } catch (e) {}
+      // Remove unread marker locally
+      try {
+        queryClient.setQueryData(['conversations'], (old = []) =>
+          old.map((c) => (String(c._id) === String(activeConv._id) ? { ...c, _hasUnread: false } : c))
+        );
+      } catch (e) {}
+      shouldScrollRef.current = true;
+    } catch (e) {}
+  }, [activeConv]);
+
+  /* ────────── Socket event handlers ────────── */
+  useEffect(() => {
+    /* receive-message: add to the active conversation's cache */
+    const onReceive = (msg) => {
+      const convId = String(msg.conversationId);
+
+      // Update messages cache if it's the open conversation
+          queryClient.setQueryData(["messages", convId], (old) => {
+            if (!old) return { pages: [[msg]], pageParams: [null] };
+            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+            const lastIdx = norm.pages.length - 1;
+            const exists = norm.pages[lastIdx].some((m) => String(m._id) === String(msg._id));
+            if (exists) return norm;
+            const pages = norm.pages.map((p, i) => (i === lastIdx ? [...p, msg] : p));
+            return { ...norm, pages };
+          });
+
+      try {
+        const activeId = activeConv && activeConv._id ? String(activeConv._id) : null;
+        if (activeId && activeId === convId) {
+          shouldScrollRef.current = true;
+        }
+      } catch (e) {}
+
+      // Update conversations list last message
+      queryClient.setQueryData(["conversations"], (old = []) =>
+        old.map((c) =>
+          String(c._id) === convId
+            ? {
+              ...c,
+              lastMessage: {
+                content: msg.content || (msg.attachments?.[0]?.type === "image" ? "📷 Photo" : msg.attachments?.[0]?.type === "audio" ? "🎵 Audio" : "📄 File"),
+                timestamp: msg.timestamp,
+              },
+              updatedAt: msg.timestamp,
+            }
+            : c
+        ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      );
+
+      // If this message is for a conversation that is NOT currently open,
+      // mark that conversation as having unread messages so the chat list
+      // can display the green dot. (This also covers the case where the
+      // user is on the Messages page but viewing a different conversation.)
+      try {
+        const activeId = activeConv && activeConv._id ? String(activeConv._id) : null;
+        if (!activeId || activeId !== convId) {
+          queryClient.setQueryData(["conversations"], (old = []) =>
+            old.map((c) => (String(c._id) === convId ? { ...c, _hasUnread: true } : c))
+          );
+        }
+      } catch (e) {}
+
+      // If this message belongs to the currently open conversation, and it's
+      // from the other user, immediately mark it as seen on the server so the
+      // sender receives the seen update without waiting for a manual reopen.
+      try {
+        const activeId = activeConv && activeConv._id ? String(activeConv._id) : null;
+        const senderId = msg.sender_id && (msg.sender_id._id || msg.sender_id);
+        if (activeId && activeId === convId && senderId && String(senderId) !== String(myId)) {
+          socket.emit("message-seen", { conversationId: convId });
+        }
+      } catch (e) { /* ignore */ }
     };
-    setActiveChat(newChat);
-    setIsSearchMode(false);
-    setSearchQuery("");
+    /* message-status: update status field of a specific message */
+    const onStatus = ({ messageId, status }) => {
+          queryClient.setQueryData(["messages", activeConv?._id], (old) => {
+            if (!old) return old;
+            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+            const pages = norm.pages.map((p) => p.map((m) => (String(m._id) === String(messageId) ? { ...m, status } : m)));
+            return { ...norm, pages };
+          });
+    };
+
+    /* messages-seen: update multiple messages to "seen" */
+    const onSeen = ({ conversationId, messageIds }) => {
+          queryClient.setQueryData(["messages", conversationId], (old) => {
+            if (!old) return old;
+            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+            const ids = messageIds.map(String);
+            const pages = norm.pages.map((p) => p.map((m) => (ids.includes(String(m._id)) ? { ...m, status: "seen" } : m)));
+            return { ...norm, pages };
+          });
+    };
+
+    /* message-deleted: remove from cache */
+    const onDeleted = ({ messageId, conversationId }) => {
+          queryClient.setQueryData(["messages", conversationId], (old) => {
+            if (!old) return old;
+            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+            const pages = norm.pages.map((p) => p.filter((m) => String(m._id) !== String(messageId)));
+            return { ...norm, pages };
+          });
+    };
+
+    /* presence */
+    const onOnline = ({ userId }) =>
+      setOnlineUsers((prev) => new Set([...prev, String(userId)]));
+    const onOffline = ({ userId }) =>
+      setOnlineUsers((prev) => {
+        const s = new Set(prev);
+        s.delete(String(userId));
+        return s;
+      });
+
+      /* new conversation created for me (recipient) — add to conversations */
+      const onConversationCreated = ({ conversation }) => {
+        if (!conversation) return;
+        // Insert at top if not present
+        queryClient.setQueryData(["conversations"], (old = []) => {
+          const exists = old.some((c) => String(c._id) === String(conversation._id));
+          const merged = exists
+            ? old.map((c) => (String(c._id) === String(conversation._id) ? { ...c, ...conversation } : c))
+            : [conversation, ...old];
+          return merged.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        });
+
+        // If user currently has a temporary DM open with this otherUserId,
+        // attach the real conversation id so messages will load and UI will show it.
+        try {
+          if (activeConv && !activeConv._id && String(activeConv.otherUserId) === String(conversation.otherUserId)) {
+            setActiveConv((prev) => ({ ...(prev || {}), _id: conversation._id }));
+            // refresh conversations to populate names/metadata
+            refetchConvs();
+          }
+        } catch (e) { /* ignore */ }
+      };
+
+    /* typing */
+    const onTyping = ({ conversationId }) =>
+      setTypingUsers((prev) => ({ ...prev, [conversationId]: true }));
+    const onStopTyping = ({ conversationId }) =>
+      setTypingUsers((prev) => ({ ...prev, [conversationId]: false }));
+
+    socket.on("receive-message", onReceive);
+    socket.on("message-status", onStatus);
+    socket.on("messages-seen", onSeen);
+    socket.on("message-deleted", onDeleted);
+    socket.on("user-online", onOnline);
+    socket.on("user-offline", onOffline);
+    socket.on("typing", onTyping);
+    socket.on("stop-typing", onStopTyping);
+    socket.on("conversation-created", onConversationCreated);
+
+    return () => {
+      socket.off("receive-message", onReceive);
+      socket.off("message-status", onStatus);
+      socket.off("messages-seen", onSeen);
+      socket.off("message-deleted", onDeleted);
+      socket.off("user-online", onOnline);
+      socket.off("user-offline", onOffline);
+      socket.off("typing", onTyping);
+      socket.off("stop-typing", onStopTyping);
+      socket.off("conversation-created", onConversationCreated);
+    };
+  }, [queryClient, activeConv?._id]);
+
+  // Group conversations deprecated — no room joins required.
+
+  /* ────────── Select conversation ────────── */
+  const handleSelectConv = useCallback((conv) => {
+    setActiveConv(conv);
+  }, []);
+
+  /* ────────── Select user from search → open DM (do NOT create DB conv yet) ────────── */
+  const handleSelectUser = useCallback(async (user) => {
+    try {
+      // Don't call the server to create the conversation yet. Open a temporary
+      // direct-chat UI so the user can type — the conversation will be created
+      // on first message send.
+      const conv = {
+        // no _id yet — indicates a local-only conversation
+        type: "direct",
+        name: user.fullName || user.name || "",
+        username: user.username,
+        otherUserId: user._id,
+        lastMessage: { content: "" },
+        updatedAt: new Date().toISOString(),
+      };
+      setActiveConv(conv);
+      // Keep conversation list unchanged; when a real conversation is created
+      // we will refetch conversations (server will emit receive-message).
+      setIsSearchMode(false);
+      setSearchQuery("");
+    } catch (err) {
+      console.error("open DM error:", err);
+    }
+  }, [refetchConvs]);
+
+  /* ────────── Typing indicator emission ────────── */
+  const handleInputChange = (e) => {
+    setInputText(e.target.value);
+    if (!activeConv) return;
+
+    if (!isTyping) {
+      setIsTyping(true);
+      socket.emit("typing", {
+        conversationId: activeConv._id,
+        receiverId: activeConv.otherUserId,
+      });
+    }
+
+    clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      setIsTyping(false);
+      socket.emit("stop-typing", {
+        conversationId: activeConv._id,
+        receiverId: activeConv.otherUserId,
+      });
+    }, 1500);
   };
 
-  /* ── Send message ── */
-  const handleSend = () => {
-    if (!inputText.trim() || !activeChat) return;
-    const newMsg = {
-      id: `m${Date.now()}`,
-      senderId: "me",
-      type: "text",
+  /* close header menu on outside click */
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const handler = (e) => {
+      const t = e.target;
+      if (
+        headerMenuRef.current && headerMenuRef.current.contains(t)
+      ) {
+        return;
+      }
+      if (
+        headerMenuButtonRef.current && headerMenuButtonRef.current.contains(t)
+      ) {
+        return;
+      }
+      setHeaderMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [headerMenuOpen]);
+
+  /* ────────── File upload ────────── */
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset input
+
+    const MAX = 10 * 1024 * 1024;
+    if (file.size > MAX) {
+      alert("File too large. Maximum size is 10 MB.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${API}/upload`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.message || "Upload failed");
+        return;
+      }
+      const data = await res.json();
+      setAttachmentPending({
+        url: data.url,
+        fileName: data.fileName,
+        fileType: data.fileType,
+        size: data.size,
+      });
+    } catch (err) {
+      console.error("upload error:", err);
+      alert("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /* ────────── Send message ────────── */
+  const handleSend = useCallback(() => {
+    if (!activeConv) return;
+    if (!inputText.trim() && !attachmentPending) return;
+
+    const attachments = attachmentPending
+      ? [
+        {
+          type: attachmentPending.fileType,
+          url: attachmentPending.url,
+          fileName: attachmentPending.fileName,
+          size: attachmentPending.size,
+        },
+      ]
+      : [];
+
+    const payload = {
+      conversationId: activeConv?._id,
       content: inputText.trim(),
-      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      attachments,
+      receiverId: activeConv?.otherUserId || undefined,
     };
-    setMessages((prev) => ({
-      ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), newMsg],
-    }));
+
+    shouldScrollRef.current = true;
+
+    // If the last message has a different date than now, show a temporary
+    // date separator immediately so the user sees the day divider before
+    // the server ack arrives. This is a client-only UI helper; the real
+    // separator will be derived from server timestamps after refresh.
+    try {
+      const convId = activeConv._id ? String(activeConv._id) : "pending-" + String(activeConv.otherUserId || "");
+      const lastMsg = messages && messages.length ? messages[messages.length - 1] : null;
+      const lastDate = lastMsg ? stripDate(lastMsg.timestamp) : null;
+      const nowDate = stripDate(Date.now());
+      if (lastDate !== nowDate) {
+        setManualSeparators((prev) => {
+          const copy = { ...(prev || {}) };
+          const set = new Set(copy[convId] ? Array.from(copy[convId]) : []);
+          set.add(nowDate);
+          copy[convId] = set;
+          return copy;
+        });
+      }
+    } catch (e) {}
+    socket.emit("send-message", payload, (response) => {
+      if (response?.error) {
+        console.error("send-message error:", response.error);
+        return;
+      }
+
+      // If the server created a conversation (first message), it will return
+      // the new conversationId alongside the message. Use that when updating
+      // caches and active conversation state.
+      const convId = response?.conversationId || activeConv?._id;
+      if (response?.message) {
+        if (convId) {
+          // ensure activeConv has the real _id if it was created
+          if (!activeConv?._id) setActiveConv((prev) => ({ ...(prev || {}), _id: convId }));
+
+          queryClient.setQueryData(["messages", convId], (old) => {
+            if (!old) return { pages: [[response.message]], pageParams: [null] };
+            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+            const lastIdx = norm.pages.length - 1;
+            const exists = norm.pages[lastIdx].some((m) => String(m._id) === String(response.message._id));
+            if (exists) return norm;
+            const pages = norm.pages.map((p, i) => (i === lastIdx ? [...p, response.message] : p));
+            return { ...norm, pages };
+          });
+
+          // Refresh conversations list so the new conversation appears
+          refetchConvs();
+
+          // Clear any manual separator we added for this conv + date
+          try {
+            const nowDate = stripDate(response.message.timestamp || Date.now());
+            setManualSeparators((prev) => {
+              if (!prev) return prev;
+              const copy = { ...prev };
+              const set = copy[convId] ? new Set(Array.from(copy[convId])) : null;
+              if (set && set.has(nowDate)) {
+                set.delete(nowDate);
+                if (set.size === 0) delete copy[convId];
+                else copy[convId] = set;
+              }
+              return copy;
+            });
+          } catch (e) {}
+        }
+      }
+    });
+
     setInputText("");
+    setAttachmentPending(null);
+    clearTimeout(typingTimer.current);
+    setIsTyping(false);
+    socket.emit("stop-typing", {
+      conversationId: activeConv._id,
+      receiverId: activeConv.otherUserId,
+    });
+  }, [activeConv, inputText, attachmentPending, queryClient]);
+
+  /* ────────── Delete message ────────── */
+  const handleDelete = useCallback(
+    (messageId) => {
+      if (!activeConv) return;
+      try {
+        queryClient.setQueryData(["messages", activeConv._id], (old) => {
+          if (!old) return old;
+          const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
+          const pages = norm.pages.map((p) => p.filter((m) => String(m._id) !== String(messageId)));
+          return { ...norm, pages };
+        });
+      } catch (e) {}
+
+      socket.emit(
+        "delete-message",
+        {
+          messageId,
+          conversationId: activeConv._id,
+        },
+        (res) => {
+          if (res && res.error) {
+            showNotification("Delete failed", "error");
+          } else {
+            showNotification("Message deleted", "success");
+          }
+        }
+      );
+    },
+    [activeConv]
+  );
+
+  const showNotification = (msg, type = "info", duration = 2500) => {
+    setNotification({ open: true, message: msg, type, closing: false });
+    window.setTimeout(() => {
+      setNotification((s) => ({ ...s, closing: true }));
+      window.setTimeout(() => setNotification({ open: false, message: "", type: "info", closing: false }), 300);
+    }, duration);
   };
 
-  /* ── Delete message ── */
-  const handleDelete = (chatId, msgId) => {
-    setMessages((prev) => ({
-      ...prev,
-      [chatId]: (prev[chatId] || []).filter((m) => m.id !== msgId),
-    }));
-    // TODO: emit socket event & delete from DB
-  };
+  /* ────────── Find the index of the last sent message (for status display) ────────── */
+  const lastSentIdx = messages
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => String(m.sender_id?._id || m.sender_id) === String(myId))
+    .pop()?.i;
 
-  const currentMessages = activeChat ? messages[activeChat.id] || [] : [];
+  /* ════ RENDER ════ */
+  // If navigated here with an openConversationId OR openConversationOtherUserId,
+  // open the conversation (or a temporary DM) once conversations are loaded.
+  useEffect(() => {
+    try {
+      const openId = location && location.state && (location.state.openConversationId || location.state.openConversation);
+      const openOtherUserId = location && location.state && location.state.openConversationOtherUserId;
+
+      if (openId) {
+        if (conversations && conversations.length > 0) {
+          const found = conversations.find((c) => String(c._id) === String(openId));
+          if (found) {
+            setActiveConv(found);
+            return;
+          }
+        }
+        // If not found yet, refetch conversations and try to open
+        refetchConvs().then(() => {
+          const list = queryClient.getQueryData(["conversations"]) || [];
+          const f = list.find((c) => String(c._id) === String(openId));
+          if (f) setActiveConv(f);
+        }).catch(() => { });
+        return;
+      }
+
+      if (openOtherUserId) {
+        // Try to find an existing conversation with this other user
+        if (conversations && conversations.length > 0) {
+          const found = conversations.find((c) => String(c.otherUserId) === String(openOtherUserId));
+          if (found) {
+            setActiveConv(found);
+            return;
+          }
+        }
+
+        // Not found — open a temporary DM (no _id) so the user can type.
+        const tempName = (location.state && location.state.openConversationOtherUserName) || "";
+        const conv = {
+          type: "direct",
+          name: tempName,
+          username: "",
+          otherUserId: openOtherUserId,
+          lastMessage: { content: "" },
+          updatedAt: new Date().toISOString(),
+        };
+        setActiveConv(conv);
+        return;
+      }
+    } catch (e) { }
+  }, [conversations, location && location.state && (location.state.openConversationId || location.state.openConversationOtherUserId), refetchConvs, queryClient]);
 
   return (
     <div className="msg-page">
+      {notification.open && (
+        <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
+      )}
+      {imageModal.open && (
+        <div onClick={() => setImageModal({ open: false, url: '', fileName: '' })} style={{ position: 'fixed', zIndex: 99999, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={(e) => { e.stopPropagation(); setImageModal({ open: false, url: '', fileName: '' }); }} style={{ position: 'absolute', top: 18, left: 18, zIndex: 100000, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', padding: '8px 12px', borderRadius: 6, cursor: 'pointer' }}>Back</button>
+          <img onClick={(e) => e.stopPropagation()} src={imageModal.url} alt={imageModal.fileName || 'image'} style={{ maxWidth: '95%', maxHeight: '92%', boxShadow: '0 6px 24px rgba(0,0,0,0.6)' }} />
+        </div>
+      )}
       {/* ═══════════ LEFT PANEL ═══════════ */}
       <div className="msg-left-panel">
         <div className="msg-panel-header">
           <h2>Messages</h2>
-          <p>{DUMMY_CHATS.length} conversations</p>
+          <p>{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</p>
         </div>
 
         {isSearchMode ? (
@@ -684,8 +1313,10 @@ const Messages = () => {
             <div className="msg-search-header">
               <button
                 className="msg-search-back-btn"
-                onClick={() => { setIsSearchMode(false); setSearchQuery(""); }}
-                title="Back"
+                onClick={() => {
+                  setIsSearchMode(false);
+                  setSearchQuery("");
+                }}
               >
                 <BackArrowIcon />
               </button>
@@ -693,14 +1324,20 @@ const Messages = () => {
                 <SearchIcon />
                 <input
                   className="msg-search-input"
-                  placeholder="Search users by name..."
+                  placeholder="Search by username…"
                   autoFocus
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
                 {searchQuery && (
                   <button
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#b0bab7", padding: 0 }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#b0bab7",
+                      padding: 0,
+                    }}
                     onClick={() => setSearchQuery("")}
                   >
                     <XIcon />
@@ -723,32 +1360,45 @@ const Messages = () => {
               )}
               {searchResults.map((user) => (
                 <div
-                  key={user.id}
+                  key={user._id}
                   className="msg-chat-item"
-                  onClick={() => handleSelectSearchUser(user)}
+                  onClick={() => handleSelectUser(user)}
                 >
-                  <Avatar initials={user.initials} variant={user.avatarVariant} />
+                  <Avatar name={user.fullName} />
                   <div className="msg-chat-info">
-                    <div className="msg-chat-name">{user.name}</div>
-                    <div className="msg-chat-preview">{user.role}</div>
+                    <div className="msg-chat-name">{user.fullName}</div>
+                    <div className="msg-chat-preview">
+                      @{user.username} · {user.role}
+                    </div>
                   </div>
-                  <span style={{ fontSize: 12, color: "#08C18A", fontWeight: 600 }}>Chat</span>
+                  <span
+                    style={{ fontSize: 12, color: "#08C18A", fontWeight: 600 }}
+                  >
+                    Chat
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          /* ─── Chat List Mode ─── */
+          /* ─── Chat List ─── */
           <>
             <div className="msg-chat-list">
-              {DUMMY_CHATS.map((chat) => (
+              {conversations.map((conv) => (
                 <ChatItem
-                  key={chat.id}
-                  chat={chat}
-                  isActive={activeChat?.id === chat.id}
-                  onClick={handleSelectChat}
+                  key={conv._id}
+                  conv={conv}
+                  isActive={activeConv?._id === conv._id}
+                  onClick={handleSelectConv}
+                  onlineUsers={onlineUsers}
+                  typingUsers={typingUsers}
                 />
               ))}
+              {conversations.length === 0 && (
+                <div className="msg-search-empty">
+                  <p>No conversations yet. Start one!</p>
+                </div>
+              )}
             </div>
 
             {/* Floating New Chat Button */}
@@ -765,8 +1415,7 @@ const Messages = () => {
 
       {/* ═══════════ RIGHT PANEL ═══════════ */}
       <div className="msg-right-panel">
-        {!activeChat ? (
-          /* ─── Empty State ─── */
+        {!activeConv ? (
           <div className="msg-empty-state">
             <div className="empty-icon">
               <ChatBubbleIcon />
@@ -776,95 +1425,209 @@ const Messages = () => {
           </div>
         ) : (
           <>
-            {/* ─── Conversation Header ─── */}
+            {/* ─── Header ─── */}
             <div className="msg-conv-header">
-              <Avatar initials={activeChat.initials} variant={activeChat.avatarVariant} size={40} />
+              <Avatar name={activeConv.name} size={40} />
               <div className="header-info">
-                <div className="header-name">{activeChat.name}</div>
+                <div className="header-name">{activeConv.name}</div>
                 <div className="header-status">
-                  {activeChat.online ? "● Online" : "Last seen recently"}
+                  {activeConv.type === "group"
+                    ? "Group Chat"
+                    : onlineUsers.has(String(activeConv.otherUserId))
+                      ? "● Online"
+                      : ""}
                 </div>
               </div>
               <div className="header-actions">
-                <button className="msg-icon-btn" title="Search in chat"><SearchIcon /></button>
-                <button className="msg-icon-btn" title="More options"><DotsIcon /></button>
+                <button
+                  className="msg-icon-btn"
+                  title="More options"
+                  onClick={() => setHeaderMenuOpen((v) => !v)}
+                  ref={headerMenuButtonRef}
+                >
+                  <DotsIcon />
+                </button>
+                {headerMenuOpen && (
+                  <div className="msg-conv-menu" ref={headerMenuRef}>
+                    <button
+                      className="msg-conv-menu-item"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setActiveConv(null);
+                      }}
+                    >
+                      Close Chat
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* ─── Messages Area ─── */}
             <div className="msg-messages-area">
-              {/* Date Divider */}
-              <div className="msg-date-divider">
-                <span>Today</span>
-              </div>
+              {/* Load more (cursor pagination) */}
+              {hasNextPage && (
+                <div style={{ textAlign: "center", marginBottom: 8 }}>
+                  <button
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#08C18A",
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                    onClick={() => {
+                      // disable auto-scroll (ensure we don't jump to bottom)
+                      shouldScrollRef.current = false;
+                      const area = messagesEndRef.current && messagesEndRef.current.parentElement;
+                      if (area) {
+                        preserveScrollRef.current = { active: true, prevScrollHeight: area.scrollHeight, prevScrollTop: area.scrollTop };
+                      }
+                      fetchNextPage();
+                    }}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? "Loading…" : "Load older messages"}
+                  </button>
+                </div>
+              )}
 
-              {currentMessages.map((msg) => {
-                const isSent = msg.senderId === "me";
-                const deleteMsg = (id) => handleDelete(activeChat.id, id);
+              {
+                (() => {
+                  const nodes = [];
+                  let prevDate = null;
+                  for (let i = 0; i < messages.length; i++) {
+                    const msg = messages[i];
+                    const curDate = stripDate(msg.timestamp);
+                    if (curDate !== prevDate) {
+                      nodes.push(
+                        <DateSeparator key={`sep-${curDate}-${i}`} label={formatDateLabel(msg.timestamp)} />
+                      );
+                    }
+                    const isSent = String(msg.sender_id?._id || msg.sender_id) === String(myId);
+                    nodes.push(
+                      <MessageRow
+                        key={msg._id}
+                        msg={msg}
+                        isSent={isSent}
+                        myId={myId}
+                        onDelete={handleDelete}
+                        isLastSent={isSent && i === lastSentIdx}
+                      />
+                    );
+                    prevDate = curDate;
+                  }
 
-                if (msg.type === "text") {
-                  return (
-                    <TextMessage
-                      key={msg.id}
-                      msg={msg}
-                      isSent={isSent}
-                      onDelete={deleteMsg}
-                    />
-                  );
-                }
-                if (msg.type === "image") {
-                  return (
-                    <ImageMessage
-                      key={msg.id}
-                      msg={msg}
-                      isSent={isSent}
-                      onDelete={deleteMsg}
-                    />
-                  );
-                }
-                if (msg.type === "audio") {
-                  return (
-                    <AudioMessage
-                      key={msg.id}
-                      msg={msg}
-                      isSent={isSent}
-                      onDelete={deleteMsg}
-                    />
-                  );
-                }
-                if (msg.type === "doc") {
-                  return (
-                    <DocMessage
-                      key={msg.id}
-                      msg={msg}
-                      isSent={isSent}
-                      onDelete={deleteMsg}
-                    />
-                  );
-                }
-                return null;
-              })}
+                  // If user added a separator client-side (while sending) but the
+                  // optimistic message hasn't been persisted yet, render that
+                  // manual separator at the end so it appears immediately.
+                  try {
+                    const convId = activeConv && activeConv._id ? String(activeConv._id) : "pending-" + String(activeConv?.otherUserId || "");
+                    const manual = manualSeparators && manualSeparators[convId];
+                    if (manual && manual instanceof Set) {
+                      for (const dateStr of Array.from(manual)) {
+                        // only render if it's not already the prevDate
+                        if (dateStr !== prevDate) {
+                          const dt = new Date(dateStr);
+                          nodes.push(
+                            <DateSeparator key={`manual-${dateStr}`} label={formatDateLabel(dt)} />
+                          );
+                        }
+                      }
+                    }
+                  } catch (e) {}
+
+                  return nodes;
+                })()
+              }
+
+              {/* Typing indicator */}
+              {typingUsers[activeConv._id] && (
+                <div className="msg-row received">
+                  <div className="msg-row-avatar">…</div>
+                  <div className="msg-bubble-wrap">
+                    <div className="msg-bubble" >
+                      <TypingLoader />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div ref={messagesEndRef} />
             </div>
 
+            {/* ─── Attachment Preview ─── */}
+            {attachmentPending && (
+              <div
+                style={{
+                  padding: "6px 16px",
+                  background: "#edfaf5",
+                  borderTop: "1px solid #d0eae3",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  fontSize: 13,
+                }}
+              >
+                {attachmentPending.fileType === "image" ? (
+                  <>
+                    <img
+                      src={attachmentPending.url}
+                      alt="preview"
+                      style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }}
+                    />
+                    {attachmentPending.fileName}
+                  </>
+                ) : (
+                  <>
+                    <DocIcon />
+                    {attachmentPending.fileName}
+                  </>
+                )}
+                <button
+                  onClick={() => setAttachmentPending(null)}
+                  style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#e53935" }}
+                >
+                  <XIcon />
+                </button>
+              </div>
+            )}
+
             {/* ─── Input Bar ─── */}
             <div className="msg-input-bar">
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                accept=".jpg,.jpeg,.png,.webp,.mp3,.pdf,.doc,.docx,.zip"
+                onChange={handleFileChange}
+              />
               <div className="msg-input-wrap">
                 <button className="msg-emoji-btn" title="Emoji">
                   <EmojiIcon />
                 </button>
                 <input
-                  placeholder="Type a message..."
+                  placeholder={uploading ? "Uploading…" : "Type a message…"}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  disabled={uploading}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                 />
-                <button className="msg-attach-btn" title="Attach file">
+                <button
+                  className="msg-attach-btn"
+                  title="Attach file"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
                   <AttachIcon />
                 </button>
               </div>
-              <button className="msg-send-btn" onClick={handleSend} title="Send">
+              <button
+                className="msg-send-btn"
+                onClick={handleSend}
+                title="Send"
+                disabled={!inputText.trim() && !attachmentPending}
+              >
                 <SendIcon />
               </button>
             </div>
@@ -875,7 +1638,7 @@ const Messages = () => {
   );
 };
 
-/* ─────────────── SVG ICONS ─────────────── */
+/* ─────────────── SVG ICONS (unchanged from UI version) ─────────────── */
 const PlayIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
     <path d="M8 5v14l11-7z" />
@@ -970,12 +1733,6 @@ const EmojiIcon = () => (
 const AttachIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
     <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
-  </svg>
-);
-
-const CheckDoubleIcon = () => (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-    <path d="M0.41 13.41L6 19l1.41-1.42L1.83 12zm20.36-6.58L11 17.17l-4.59-4.58L5 14l6 6 12-12zM18 7l-1.41-1.42-6.35 6.35 1.42 1.41z" />
   </svg>
 );
 

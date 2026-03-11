@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { API_BASE, useMe } from "../Services/useMe";
 import MessageBox from "./MessageBox";
 import ConfirmDialog from "./ConfirmDialog";
@@ -7,6 +8,7 @@ export default function NotificationPanel() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const { data: me } = useMe();
+  const navigate = useNavigate();
   const [notification, setNotification] = useState({ open: false, message: "", type: "info", closing: false });
 
   const showMessage = (msg, type = "info", duration = 3000) => {
@@ -48,6 +50,16 @@ export default function NotificationPanel() {
       // fetch application details for relevant notifications
       const enriched = await Promise.all(
         list.map(async (n) => {
+          // enrich message notifications with message + sender data
+          if (n.type === 'message' && n.referenceId) {
+            try {
+              const r = await fetch(`${API_BASE}/api/chat/messages/${n.referenceId}`, { credentials: 'include' });
+              if (r.ok) {
+                const msg = await r.json();
+                return { ...n, _message: msg };
+              }
+            } catch (e) { /* ignore */ }
+          }
           const appId = n.application_id || (n.type !== "message" ? n.referenceId : null);
           if (appId && (n.type === "application" || n.type === "accepted" || n.type === "rejected")) {
             try {
@@ -99,7 +111,41 @@ export default function NotificationPanel() {
         markRead(n._id).catch(() => { });
       }
     } else {
-      // fallback: mark read
+      // If it's a message notification, navigate to Messages and clear related notifs.
+      if (n.type === 'message' && n.referenceId) {
+        (async () => {
+          try {
+            // fetch message to obtain conversationId
+            const r = await fetch(`${API_BASE}/api/chat/messages/${n.referenceId}`, { credentials: 'include' });
+            if (r.ok) {
+              const msg = await r.json();
+              const convId = msg.conversationId;
+              // mark this notification read
+              if (!n.read) await markRead(n._id);
+              // clear other notifications for this conversation
+              try {
+                await fetch(`${API_BASE}/notifications/clear-chat`, {
+                  method: 'POST',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ conversationId: convId }),
+                });
+              } catch (e) { }
+              // close notification panel (ask Topbar to hide it), then navigate
+              try { window.dispatchEvent(new CustomEvent('notify:close-panel')); } catch (e) {}
+              navigate('/home/messages', { state: { openConversationId: convId } });
+            } else {
+              // fallback: just mark read
+              if (!n.read) markRead(n._id).catch(() => { });
+            }
+          } catch (err) {
+            if (!n.read) markRead(n._id).catch(() => { });
+          }
+        })();
+        return;
+      }
+
+      // fallback for non-message notifications: mark read
       if (!n.read) markRead(n._id).catch(() => { });
     }
   };
@@ -150,24 +196,40 @@ export default function NotificationPanel() {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
               <div>
                 {n.type === 'application' && (
-                  <div style={{ fontWeight: 600 }}>
-                    New application
-                    {n.application && n.application.opportunityId && (` — ${n.application.opportunityId.title || 'Opportunity'}`)}
+                  <div>
+                    <div style={{ fontWeight: 700 }}>New Application</div>
+                    <div style={{ fontWeight: 600, marginTop: 6 }}>{(n.application && n.application.opportunityId && (n.application.opportunityId.title || 'Opportunity')) || (n.meta && n.meta.title) || 'Opportunity'}</div>
+                    <div style={{ marginTop: 8, color: '#444' }}>
+                      You received a new application from {(n.application && n.application.volunteerId && n.application.volunteerId.fullName) || (n.meta && n.meta.senderName) || 'Someone'}
+                    </div>
                   </div>
                 )}
-                {n.type === 'accepted' && <div style={{ fontWeight: 600 }}>Application accepted</div>}
-                {n.type === 'rejected' && <div style={{ fontWeight: 600 }}>Application rejected</div>}
-                {n.type === 'message' && <div style={{ fontWeight: 600 }}>New message</div>}
 
-                <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
-                  {n.application && n.application.volunteerId && (
-                    <div style={{ fontWeight: 500 }}>{n.application.volunteerId.fullName} — {n.application.volunteerId.email}</div>
-                  )}
-                </div>
+                {(n.type === 'accepted' || n.type === 'rejected') && (
+                  <div>
+                    <div style={{ fontWeight: 700 }}>Application {n.type === 'accepted' ? 'accepted' : 'rejected'}</div>
+                    <div style={{ fontWeight: 600, marginTop: 6 }}>{(n.application && n.application.opportunityId && (n.application.opportunityId.title || 'Opportunity')) || (n.meta && n.meta.title) || 'Opportunity'}</div>
+                    <div style={{ marginTop: 8, color: '#444' }}>
+                      Your {(n.application && n.application.opportunityId && n.application.opportunityId.title) || (n.meta && n.meta.title) || 'application'} application was {n.type === 'accepted' ? 'accepted' : 'rejected'}.
+                    </div>
+                  </div>
+                )}
+                {n.type === 'message' && (
+                  <div>
+                    <div style={{ fontWeight: 700 }}>New Message</div>
+                    <div style={{ fontWeight: 600, marginTop: 6, color: '#444' }}>
+                      {((n._message && n._message.sender_id && n._message.sender_id.fullName) || (n.meta && n.meta.senderName) || 'Someone')}
+                      {' : '}
+                      {((n._message && (n._message.content || (n._message.attachments && n._message.attachments.length > 0 && (n._message.attachments[0].type === 'image' ? '📷 Photo' : n._message.attachments[0].type === 'audio' ? '🎵 Audio' : '📄 File')))) || (n.meta && n.meta.message) || '')}
+                    </div>
+                  </div>
+                )}
+
+                
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                {!n.read && (
+                {(n.type === 'application' || n.type === 'accepted' || n.type === 'rejected' || !n.read) && (
                   <button
                     onClick={(e) => { e.stopPropagation(); markRead(n._id); }}
                     style={{
@@ -446,7 +508,7 @@ export function VolunteerApplicationModal({ notif, onClose, onAction }) {
                 <div style={{ fontSize: 15 }}><strong>Location:</strong> <span style={{ color: '#2c7a7b', marginLeft: 4 }}>{opp.city || (typeof opp.location === 'string' ? opp.location : (opp.location.type === 'Point' && Array.isArray(opp.location.coordinates) ? `Lat: ${opp.location.coordinates[0]}, Lon: ${opp.location.coordinates[1]}` : 'N/A'))}</span></div>
               )}
               {opp.duration && (
-                <div style={{ fontSize: 15 }}><strong>Duration:</strong> <span style={{ color: '#2c7a7b', marginLeft: 4 }}>{opp.duration}</span></div>
+                <div style={{ fontSize: 15 }}><strong>Duration:</strong> <span style={{ color: '#2c7a7b', marginLeft: 4 }}>{opp.duration} Hours</span></div>
               )}
             </div>
           </>
