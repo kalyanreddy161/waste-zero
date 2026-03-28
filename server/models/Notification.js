@@ -13,7 +13,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["application", "accepted", "rejected", "message"],
+      enum: ["application", "accepted", "rejected", "message", "pickup_completed", "pickup_accepted"],
       required: true,
     },
     referenceId: {

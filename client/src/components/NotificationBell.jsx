@@ -30,11 +30,11 @@ export default function BellToggle() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background-color: #08C18A;
+          background-color: var(--primary);
           border-radius: 50%;
           cursor: pointer;
           transition-duration: 0.3s;
-          box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.13);
+          box-shadow: var(--shadow-medium);
           border: none;
         }
 
@@ -49,7 +49,7 @@ export default function BellToggle() {
         }
 
         .bell-button:hover {
-          background-color: #068961;
+          background-color: var(--primary-hover);
         }
 
         .bell-button:hover .bell-icon {

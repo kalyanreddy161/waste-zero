@@ -24,8 +24,13 @@ function buildPushPayload({ type, meta }) {
   let url = '/home';
 
   if (type === 'message') {
-    title = 'New Message';
-    body = (meta && meta.senderName ? meta.senderName + ': ' : '') + (meta && meta.message ? meta.message : 'You have a new message');
+    if (meta && meta.messageSubject) {
+      title = meta.messageSubject;
+      body = meta.messageSubject;
+    } else {
+      title = 'New Message';
+      body = (meta && meta.senderName ? meta.senderName + ': ' : '') + (meta && meta.message ? meta.message : 'You have a new message');
+    }
     url = `/home/messages`;
     if (meta && meta.conversationId) url = `/home/messages?conversation=${meta.conversationId}`;
   } else if (type === 'application') {
@@ -36,6 +41,14 @@ function buildPushPayload({ type, meta }) {
     title = 'Application Update';
     body = meta && meta.opportunityTitle ? `Your ${meta.opportunityTitle} application ${type}` : `Your application was ${type}`;
     url = '/home/opportunities';
+  } else if (type === 'pickup_completed') {
+    title = 'Pickup Completed';
+    body = `Your pickup is completed. Click to open.`;
+    url = meta && meta.pickupId ? `/home/schedule?pickupId=${meta.pickupId}&tab=history&celebrate=1` : '/home/schedule?tab=history';
+  } else if (type === 'pickup_accepted') {
+    title = 'Your Pickup is Accepted';
+    body = `Your pickup is accepted by ${meta && meta.ngoName ? meta.ngoName : 'an NGO'}.`;
+    url = meta && meta.pickupId ? `/home/schedule?pickupId=${meta.pickupId}&tab=history` : '/home/schedule?tab=history';
   }
 
   return JSON.stringify({ title, body, url });
@@ -61,14 +74,32 @@ async function notify({ io, receiverId, senderId, type, referenceId, application
 
     if (meta) payload.meta = meta;
 
+    try {
+      const pushData = JSON.parse(buildPushPayload({ type, meta: meta || {} }));
+      payload.title = pushData.title;
+      payload.body = pushData.body;
+      payload.url = pushData.url;
+    } catch (e) {}
+
     const socketServer = io || global.io;
 
     // Determine presence. presence map stored on global.presence (set in server.js)
     const presence = (global && global.presence && global.presence.get(String(receiverId))) || 'offline';
+    const onlineSockets =
+      global &&
+      global.onlineUsers &&
+      global.onlineUsers.get(String(receiverId));
+    const hasLiveSockets = Boolean(onlineSockets && onlineSockets.size > 0);
 
-    // If active -> emit socket notification
-    if (socketServer && presence === 'active') {
+    // Always sync live UI state through sockets when the user still has an
+    // active connection, even if we also fall back to web push for inactive
+    // or minimized tabs.
+    if (socketServer && hasLiveSockets) {
       socketServer.to(String(receiverId)).emit('notification', payload);
+    }
+
+    // Active users do not need an additional web push.
+    if (presence === 'active') {
       return saved;
     }
 

@@ -2,27 +2,59 @@ import React, { useEffect, useState, useRef } from "react";
 import "../styles/NavbarComponents-styles/Dashboard.css";
 import Opportunities from "./Opportunities";
 import { API_BASE, useMe } from "../Services/useMe";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApplications } from "../Services/useApplications";
 import { useNavigate } from "react-router-dom";
 import { VolunteerApplicationModal } from "./NotificationPanel";
 import socket from "../services/socket";
+import AdminDashboard from "./AdminDashboard";
 import completeIcon from "../assets/icons/complete.svg";
 import pickupIcon from "../assets/icons/pickup.svg";
 import co2Icon from "../assets/icons/co2saved.svg";
 
-const Dashboard = () => {
+const StandardDashboard = ({ me }) => {
   const [previewOpps, setPreviewOpps] = useState([]);
   const carouselRef = useRef(null);
   const autoRef = useRef(null);
   const navigating = useNavigate();
-  const { data: me } = useMe();
+  const queryClient = useQueryClient();
+  const statHintTimerRef = useRef(null);
+  const [visibleStatHint, setVisibleStatHint] = useState("");
 
-  // Stats state for dashboard cards
+  // Calculate active opportunities count (status: "open" or "in-progress")
   const [activeOpportunitiesCount, setActiveOpportunitiesCount] = useState(0);
   const [opportunitiesJoinedCount, setOpportunitiesJoinedCount] = useState(0);
-  const [pickupsCompleted] = useState(0); // placeholder for now
-  const [co2Saved] = useState(0); // placeholder for now
+
+  const { data: dashboardStats } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/pickup/stats`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load dashboard stats');
+      return res.json();
+    },
+    staleTime: Infinity,
+    enabled: !!me
+  });
+
+  const pickupsCompleted = dashboardStats?.completedCount || 0;
+  const co2Saved = dashboardStats?.co2Saved || 0;
+
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (co2Saved > 0) {
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 800);
+      return () => clearTimeout(t);
+    }
+  }, [co2Saved]);
+
+  useEffect(() => {
+    return () => {
+      if (statHintTimerRef.current) {
+        clearTimeout(statHintTimerRef.current);
+      }
+    };
+  }, []);
 
   // Use react-query hook to fetch and cache applications
   const { data: applications = [], isLoading: appsLoading, error: appsError, refetch: refetchApplications } = useApplications();
@@ -108,18 +140,31 @@ const Dashboard = () => {
       }
     };
 
+    const handlePickupCompleted = (payload) => {
+      queryClient.setQueryData(["dashboard"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          co2Saved: (old.co2Saved || 0) + (payload.co2Saved || 0),
+          completedCount: (old.completedCount || 0) + 1
+        };
+      });
+    };
+
     socket.on("opportunity:created", handleOpportunitiesUpdate);
     socket.on("opportunity:updated", handleOpportunitiesUpdate);
     socket.on("opportunity:deleted", handleOpportunitiesUpdate);
     socket.on("application:status-changed", handleApplicationStatusChange);
+    socket.on("pickup:completed", handlePickupCompleted);
 
     return () => {
       socket.off("opportunity:created", handleOpportunitiesUpdate);
       socket.off("opportunity:updated", handleOpportunitiesUpdate);
       socket.off("opportunity:deleted", handleOpportunitiesUpdate);
       socket.off("application:status-changed", handleApplicationStatusChange);
+      socket.off("pickup:completed", handlePickupCompleted);
     };
-  }, [cachedOpportunities, me, refetchApplications]);
+  }, [cachedOpportunities, me, refetchApplications, queryClient]);
 
   // carousel scroll helpers
   const indexRef = useRef(0);
@@ -172,18 +217,38 @@ const Dashboard = () => {
     return copy;
   };
 
+  const showStatHint = (graphId) => {
+    if (statHintTimerRef.current) {
+      clearTimeout(statHintTimerRef.current);
+    }
+
+    setVisibleStatHint(graphId);
+    statHintTimerRef.current = setTimeout(() => {
+      setVisibleStatHint((current) => (current === graphId ? "" : current));
+    }, 3000);
+  };
+
+  const openImpactGraph = (graphId) => {
+    if (statHintTimerRef.current) {
+      clearTimeout(statHintTimerRef.current);
+    }
+
+    setVisibleStatHint("");
+    navigating(`/home/impact#${graphId}`, {
+      state: { scrollToGraph: graphId },
+    });
+  };
+
   return (
     <div className="page dashboard-page">
-      <div style={{ marginBottom: 24 }}>
-        <h2>Dashboard</h2>
-        <p style={{ color: "#777" }}>
-          Welcome back, {me?.fullName || "User"}! Here's your waste management overview.
-        </p>
+      <div className="page-header-wrapper left">
+        <h2 className="page-header">Dashboard</h2>
+        <p className="page-subtitle">Welcome back, {me?.fullName || "User"}! Here's your waste management overview.</p>
       </div>
 
       {/* Stats Cards Section */}
       <div className="dashboard-stats-container" style={{ marginBottom: 32 }}>
-        <div className="stat-card">
+        <div className="stat-card stat-card-interactive" onClick={() => showStatHint("active_opportunities")}>
           <div className="stat-icon">
             <lord-icon
               src="https://cdn.lordicon.com/mhridhuu.json"
@@ -197,9 +262,19 @@ const Dashboard = () => {
             <div className="stat-number">{activeOpportunitiesCount}</div>
             <div className="stat-label">Active Opportunities</div>
           </div>
+          <button
+            type="button"
+            className={`stat-card-statistics-button ${visibleStatHint === "active_opportunities" ? "visible" : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openImpactGraph("opportunities_chart");
+            }}
+          >
+            View Statistics
+          </button>
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card stat-card-interactive" onClick={() => showStatHint("your_opportunities")}>
           <div className="stat-icon">
             <img src={completeIcon} alt="Completed" style={{ width: '50px', height: '50px' }} />
           </div>
@@ -209,32 +284,62 @@ const Dashboard = () => {
               {me?.role === "volunteer" ? "Opportunities Joined" : "Your Opportunities"}
             </div>
           </div>
+          <button
+            type="button"
+            className={`stat-card-statistics-button ${visibleStatHint === "your_opportunities" ? "visible" : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openImpactGraph("opportunities_chart");
+            }}
+          >
+            View Statistics
+          </button>
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card stat-card-interactive" onClick={() => showStatHint("pickup_chart")}>
           <div className="stat-icon">
             <img src={pickupIcon} alt="Pickups" style={{ width: '50px', height: '50px' }} />
           </div>
           <div className="stat-content">
-            <div className="stat-number">{pickupsCompleted}</div>
+            <div className="stat-number" style={{ color: flash ? "var(--primary)" : "inherit", transition: "color 0.4s" }}>{pickupsCompleted}</div>
             <div className="stat-label">Pickups Completed</div>
           </div>
+          <button
+            type="button"
+            className={`stat-card-statistics-button ${visibleStatHint === "pickup_chart" ? "visible" : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openImpactGraph("pickup_chart");
+            }}
+          >
+            View Statistics
+          </button>
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card stat-card-interactive" onClick={() => showStatHint("co2_chart")}>
           <div className="stat-icon">
             <img src={co2Icon} alt="CO2 Saved" style={{ width: '50px', height: '50px' }} />
           </div>
           <div className="stat-content">
-            <div className="stat-number">{co2Saved}</div>
+            <div className="stat-number" style={{ color: flash ? "var(--primary)" : "inherit", transition: "color 0.4s" }}>{co2Saved.toFixed(1)}</div>
             <div className="stat-label">CO2 Saved (kg)</div>
           </div>
+          <button
+            type="button"
+            className={`stat-card-statistics-button ${visibleStatHint === "co2_chart" ? "visible" : ""}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openImpactGraph("co2_chart");
+            }}
+          >
+            View Statistics
+          </button>
         </div>
       </div>
 
       {/* Toggle switch */}
       {me && (
-        <label htmlFor="filter-toggle" className="switch" aria-label="Toggle Filter">
+        <label htmlFor="filter-toggle" className="switch dashboard-toggle" aria-label="Toggle Filter">
           <input
             type="checkbox"
             id="filter-toggle"
@@ -255,11 +360,11 @@ const Dashboard = () => {
             {appsLoading ? (
               <p>Loading applications...</p>
             ) : appsError ? (
-              <p style={{ color: 'red' }}>{appsError instanceof Error ? appsError.message : String(appsError)}</p>
+              <p style={{ color: 'var(--danger)' }}>{appsError instanceof Error ? appsError.message : String(appsError)}</p>
             ) : applications.length === 0 ? (
-              <p style={{ color: '#666' }}>You haven't applied to any opportunities yet.</p>
+              <p style={{ color: 'var(--text-muted)' }}>You haven't applied to any opportunities yet.</p>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, marginTop: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, marginTop: 12, marginBottom: 48 }}>
                 {applications.map((app) => {
                   const opp = normalizeOpportunity(app && app.opportunityId ? app.opportunityId : {});
                   const key = app._id || app.id || (opp._id || opp.id) || Math.random();
@@ -279,32 +384,32 @@ const Dashboard = () => {
                       )}
                       <div className="opp-card-body-small">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                          <h4 className="opp-card-title-small" style={{ flex: 1, minWidth: 0, margin: 0, fontSize: '1.1rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <h4 className="opp-card-title-small" style={{ flex: 1, minWidth: 0, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {opp && opp.title}
                           </h4>
                           <div style={{
-                            background: '#fff',
+                            background: 'var(--surface-primary)',
                             borderRadius: 14,
-                            padding: '4px 10px',
+                            padding: '4px 8px',
                             border: `1px solid ${statusColor}`,
                             color: statusColor,
                             fontWeight: 600,
-                            fontSize: '0.75rem',
+                            fontSize: '13px',
                             whiteSpace: 'nowrap',
                             display: 'flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            lineHeight: 1,
                           }}>
                             {status}
                           </div>
                         </div>
                         {/* Modified part: only date, no description */}
-                        <p className="opp-card-text-small" style={{ marginTop: 12, fontWeight: '600', color: '#555', fontSize: '0.9rem' }}>
+                        <p className="opp-card-text-small" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
                           Date: {opp.date || "N/A"}
                         </p>
                         <div style={{ marginTop: 16 }}>
                           <button
-                            className="primary opp-card-apply"
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', fontWeight: '600' }}
+                            className="button opp-card-apply"
                             onClick={(e) => { e.stopPropagation(); setSelectedApp(app); setShowAppModal(true); }}
                           >
                             View Details
@@ -341,6 +446,27 @@ const Dashboard = () => {
       <br /><br />
     </div>
   );
+};
+
+const Dashboard = () => {
+  const { data: me, isLoading } = useMe();
+
+  if (isLoading) {
+    return (
+      <div className="page dashboard-page">
+        <div className="page-header-wrapper left">
+          <h2 className="page-header">Dashboard</h2>
+          <p className="page-subtitle">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (me?.role === "admin") {
+    return <AdminDashboard me={me} />;
+  }
+
+  return <StandardDashboard me={me} />;
 };
 
 export default Dashboard;

@@ -7,13 +7,21 @@ const subscribe = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     const { subscription, deviceId } = req.body;
-    if (!subscription || !subscription.endpoint) return res.status(400).json({ message: 'Invalid subscription' });
+    if (!subscription || !subscription.endpoint) {
+      console.warn('Push subscribe called with invalid payload', { body: req.body });
+      return res.status(400).json({ message: 'Invalid subscription' });
+    }
 
     const endpoint = subscription.endpoint;
     const p256dh = subscription.keys && subscription.keys.p256dh;
     const auth = subscription.keys && subscription.keys.auth;
 
-    if (!p256dh || !auth) return res.status(400).json({ message: 'Invalid subscription keys' });
+    if (!p256dh || !auth) {
+      console.warn('Missing subscription keys for endpoint', endpoint);
+      return res.status(400).json({ message: 'Invalid subscription keys' });
+    }
+
+    console.log('Registering push subscription for user', userId, 'endpoint:', endpoint);
 
     await PushSubscription.updateOne(
       { endpoint },

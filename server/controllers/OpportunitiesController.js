@@ -1,11 +1,17 @@
 const Opportunity = require("../models/Opportunities");
+const Application = require("../models/Application");
+const User = require("../models/User");
+const { formatRestrictionMessage, syncModerationState } = require("../utils/accountStatus");
+const { sendDirectSystemMessage } = require("../services/chatService");
+const { buildOpportunityReportMessage } = require("../utils/moderationMessages");
+
+const sanitizeReason = (value) => String(value || "").trim();
 
 // Create a new opportunity
 // Expected body: { ngo_id, title, description, required_skills, duration, location, status? }
 const createOpportunity = async (req, res) => {
   try {
     const {
-      ngo_id,
       title,
       description,
       required_skills,
@@ -15,6 +21,29 @@ const createOpportunity = async (req, res) => {
       status,
       img_link,
     } = req.body;
+    const userId = req.session?.user?.id;
+    const role = req.session?.user?.role;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (role !== "ngo") {
+      return res.status(403).json({ message: "Only NGO users can create opportunities" });
+    }
+
+    const ngoUser = await User.findById(userId);
+    if (!ngoUser) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { isRestricted, restrictedUntil } = await syncModerationState(ngoUser);
+    if (isRestricted) {
+      return res.status(403).json({
+        message: formatRestrictionMessage(restrictedUntil, "creating opportunities"),
+        restrictedUntil,
+      });
+    }
 
     // Coerce duration to number when provided
     const durationNum = (duration === "" || duration === undefined || duration === null) ? undefined : Number(duration);
@@ -37,7 +66,7 @@ const createOpportunity = async (req, res) => {
     }
 
     const opportunity = new Opportunity({
-      ngo_id,
+      ngo_id: userId,
       title,
       description,
       required_skills,
@@ -86,6 +115,78 @@ const getParticipantsCount = async (req, res) => {
   }
 };
 
+const reportOpportunityToAdmin = async (req, res) => {
+  try {
+    const reporterId = req.session?.user?.id;
+    const reporterRole = req.session?.user?.role;
+    const { id } = req.params;
+    const reason = sanitizeReason(req.body?.reason);
+
+    if (!reporterId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (reporterRole !== "volunteer") {
+      return res.status(403).json({ message: "Only volunteers can report opportunity owners" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ message: "Reason is required" });
+    }
+
+    const opportunity = await Opportunity.findById(id).populate(
+      "ngo_id",
+      "fullName username role"
+    );
+    if (!opportunity) {
+      return res.status(404).json({ message: "Opportunity not found" });
+    }
+
+    const reportedUserId = opportunity.ngo_id?._id || opportunity.ngo_id;
+    if (!reportedUserId) {
+      return res.status(404).json({ message: "Opportunity owner not found" });
+    }
+
+    if (String(reportedUserId) === String(reporterId)) {
+      return res.status(400).json({ message: "You cannot report your own opportunity" });
+    }
+
+    const [reporter, reportedUser, adminUser] = await Promise.all([
+      User.findById(reporterId).select("fullName username role"),
+      User.findById(reportedUserId).select("fullName username role"),
+      User.findOne({ role: "admin" }).select("_id"),
+    ]);
+
+    if (!reporter || !reportedUser) {
+      return res.status(404).json({ message: "Unable to complete this report" });
+    }
+
+    if (!adminUser) {
+      return res.status(500).json({ message: "Admin account not found" });
+    }
+
+    const content = buildOpportunityReportMessage({
+      reporter,
+      reportedUser,
+      opportunity,
+      reason,
+    });
+
+    await sendDirectSystemMessage({
+      senderId: reporter._id,
+      receiverId: adminUser._id,
+      content,
+      preview: "User Report",
+      notificationSubject: "User Report",
+    });
+
+    return res.json({ message: "Reported successfully" });
+  } catch (err) {
+    console.error("reportOpportunityToAdmin error:", err);
+    return res.status(500).json({ message: "Failed to submit report" });
+  }
+};
+
 // Get all opportunities (newest first)
 const getAllOpportunities = async (req, res) => {
   try {
@@ -104,6 +205,8 @@ const updateOpportunity = async (req, res) => {
   try {
     const { id } = req.params;
     const update = { ...req.body };
+    const userId = req.session?.user?.id;
+    const role = req.session?.user?.role;
 
     // Coerce duration to number if provided in update
     if (update.duration !== undefined) {
@@ -124,6 +227,15 @@ const updateOpportunity = async (req, res) => {
       } catch (e) {
         // leave update.location as-is so validators can catch it
       }
+    }
+
+    const existing = await Opportunity.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: "Opportunity not found" });
+    }
+
+    if (role !== "admin" && String(existing.ngo_id) !== String(userId)) {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
     const updated = await Opportunity.findByIdAndUpdate(id, update, {
@@ -159,7 +271,20 @@ const updateOpportunity = async (req, res) => {
 const deleteOpportunity = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.session?.user?.id;
+    const role = req.session?.user?.role;
+    const opportunity = await Opportunity.findById(id);
+
+    if (!opportunity) {
+      return res.status(404).json({ message: "Opportunity not found" });
+    }
+
+    if (role !== "admin" && String(opportunity.ngo_id) !== String(userId)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const deleted = await Opportunity.findByIdAndDelete(id);
+    await Application.deleteMany({ opportunityId: id });
 
     if (!deleted) {
       return res.status(404).json({ message: "Opportunity not found" });
@@ -255,4 +380,5 @@ module.exports = {
   deleteOpportunity,
   getOpportunityById,
   getParticipantsCount,
+  reportOpportunityToAdmin,
 };

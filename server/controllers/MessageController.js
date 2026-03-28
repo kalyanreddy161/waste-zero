@@ -6,9 +6,7 @@
  *   2. POST /conversations/direct   — find or create a direct conversation with another user
  *   3. GET  /messages               — paginated messages for a conversation
  *   4. GET  /users/search           — search users by username (for "new chat" search panel)
- *   5. POST /groups                 — create a group chat (NGO only)
- *   6. POST /groups/:groupId/join   — volunteer joins a group (must have accepted application)
- *
+
  * Socket-based message sending/deletion is handled inside server.js socket handler,
  * so there is no POST /messages route — that comes through the socket.
  */
@@ -113,36 +111,27 @@ exports.getOrCreateDirectConversation = async (req, res) => {
 exports.getMessages = async (req, res) => {
     try {
         const userId = req.session.user.id;
-        const { conversationId, limit = 20, cursor } = req.query;
+        const { conversationId } = req.query;
 
-        // Guard against client sending the literal string "undefined" or "null"
-        if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
+        if (!conversationId) {
             return res.status(400).json({ message: "conversationId is required" });
         }
 
-        // Verify user is a participant in this conversation
         const conv = await Conversation.findOne({
             _id: conversationId,
             participants: userId,
         });
+
         if (!conv) {
             return res.status(403).json({ message: "Access denied" });
         }
 
-        // Build query — fetch messages before the cursor timestamp (if provided)
-        const query = { conversationId };
-        if (cursor) {
-            query.timestamp = { $lt: new Date(cursor) };
-        }
-
-        const messages = await Message.find(query)
-            .sort({ timestamp: -1 }) // newest first so we can slice the page
-            .limit(Number(limit))
+        const messages = await Message.find({ conversationId })
+            .sort({ timestamp: 1 }) // oldest → newest
             .populate("sender_id", "fullName username")
             .lean();
 
-        // Return in chronological order (oldest first) for the UI
-        res.json(messages.reverse());
+        res.json(messages);
     } catch (err) {
         console.error("getMessages error:", err);
         res.status(500).json({ message: "Server error" });
@@ -181,7 +170,12 @@ exports.getMessages = async (req, res) => {
 exports.searchUsers = async (req, res) => {
     try {
         const myId = req.session.user.id;
+        const myRole = req.session.user.role;
         const { q } = req.query;
+
+        if (myRole === "admin") {
+            return res.json([]);
+        }
 
         if (!q || q.trim().length < 1) {
             return res.json([]);

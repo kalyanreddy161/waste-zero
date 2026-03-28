@@ -16,6 +16,11 @@ import PageNotFound from "./components/PageNotFound";
 import { useLoading } from "./Services/LoadingContext";
 import { useEffect } from "react";
 import socket from "./services/socket";
+import {
+  initializeTheme,
+  syncThemeWithStorage,
+  syncThemeWithSystemPreference,
+} from "./Services/theme";
 
 export default function App() {
   const { isLoading } = useLoading();
@@ -29,6 +34,18 @@ export default function App() {
     // we don't need to do anything else here but keep import to initialize
     return () => {
       try { socket.off(); } catch (e) { }
+    };
+  }, []);
+
+  useEffect(() => {
+    initializeTheme();
+
+    const cleanupSystemTheme = syncThemeWithSystemPreference();
+    const cleanupStoredTheme = syncThemeWithStorage();
+
+    return () => {
+      cleanupSystemTheme();
+      cleanupStoredTheme();
     };
   }, []);
 

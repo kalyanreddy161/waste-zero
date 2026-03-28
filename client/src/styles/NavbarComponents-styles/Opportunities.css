@@ -12,7 +12,7 @@
 }
 
 .opportunities-page {
-    padding: 30px;
+    padding: 30px 30px 100px;
     width: 100%;
     max-width: none;
     margin: 0;
@@ -386,6 +386,7 @@ main.opp-hide-main-scroll {
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
@@ -426,6 +427,15 @@ main.opp-hide-main-scroll {
 .opps-card-btn:hover {
     background: #06a874;
     color: white;
+}
+
+/* When .opps-card-btn also has .button, prefer pill-style from .button but keep layout behaviour */
+.opps-card-btn.button {
+    width: auto;
+    padding-block: 10px;
+    padding-inline: 2.5rem;
+    border-radius: 9999px;
+    margin-top: auto;
 }
 
 .posted {
@@ -750,6 +760,7 @@ main.opp-hide-main-scroll {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    align-items: flex-start;
 }
 
 .details-edit-btn,
@@ -792,6 +803,326 @@ button.details-edit-btn:hover,
     background: #ffffff;
     color: #FF5E5E;
     border: 1px solid #cfd1d5
+}
+
+/* View Location button — same layout as edit/delete buttons */
+.details-location-btn {
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    background: var(--primary);
+    border: none;
+    color: white;
+}
+
+.details-location-btn:hover {
+    background: #F3F4F6 !important;
+    color: var(--primary) !important;
+    border: 1px solid #cfd1d5 !important;
+}
+
+/* Wrapper row for view location at the bottom of details box */
+.opps-view-location-row {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #E5E7EB;
+    flex-direction: row;
+    max-width: 320px;
+}
+
+.opps-admin-moderation {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid #E5E7EB;
+}
+
+.opps-admin-moderation-copy {
+    margin-bottom: 14px;
+}
+
+.opps-admin-moderation-copy strong {
+    display: block;
+    color: #0f172a;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.opps-admin-moderation-copy p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.opps-details-panel {
+    margin: 20px 0;
+    padding: 26px;
+    border: 1px solid var(--border-color);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top right, rgba(8, 193, 138, 0.12), transparent 26%),
+        linear-gradient(180deg, var(--surface-primary), var(--surface-secondary));
+    box-shadow: var(--shadow-medium);
+}
+
+.opps-details-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+}
+
+.opps-details-hero-main,
+.opps-details-hero-copy {
+    display: grid;
+    gap: 14px;
+}
+
+.opps-back-action {
+    justify-self: start;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0 52px 0 16px;
+}
+
+.opps-back-action .action-button__icon {
+    width: 38px;
+}
+
+.opps-details-hero-copy {
+    gap: 10px;
+}
+
+.opps-details-kicker {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: var(--surface-success-soft);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.opps-details-hero-copy h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.05;
+}
+
+.opps-details-hero-copy p,
+.opps-details-panel-head p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.opps-details-hero-side {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.opps-details-hero .status-pill {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.opps-details-top-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+    gap: 22px;
+    margin-bottom: 22px;
+    align-items: start;
+}
+
+.opps-details-top-content--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.opps-details-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.opps-details-summary-card,
+.opps-details-media-card,
+.opps-details-description-card,
+.opps-details-section-card {
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    background: var(--surface-primary);
+    box-shadow: var(--shadow-soft);
+}
+
+.opps-details-summary-card {
+    padding: 18px;
+    display: grid;
+    gap: 8px;
+}
+
+.opps-details-summary-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: var(--surface-success-soft);
+    color: var(--primary);
+}
+
+.opps-details-summary-card span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.opps-details-summary-card strong {
+    color: var(--text-primary);
+    font-size: 18px;
+    line-height: 1.35;
+}
+
+.opps-details-layout-redesigned {
+    grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+    gap: 22px;
+    align-items: start;
+}
+
+.opps-details-main {
+    display: grid;
+    gap: 0;
+}
+
+.opps-details-media-card,
+.opps-details-description-card,
+.opps-details-section-card {
+    padding: 22px;
+    display: grid;
+    gap: 18px;
+}
+
+.opps-details-panel-head {
+    display: grid;
+    gap: 8px;
+}
+
+.opps-details-panel-head h4 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 20px;
+}
+
+.opps-details-image-wrap {
+    min-height: 320px;
+    border-radius: 18px;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.opps-details-description p {
+    margin: 0;
+    padding: 18px 20px;
+    border-radius: 18px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-secondary);
+    color: var(--text-secondary);
+    line-height: 1.75;
+    font-size: 15px;
+    min-height: 0;
+}
+
+.opps-details-side {
+    padding: 22px;
+    border-radius: 24px;
+    background: var(--surface-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+    display: grid;
+    gap: 18px;
+}
+
+.opps-details-side-head {
+    margin-bottom: 0;
+}
+
+.opps-details-side-head h4 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.details-list {
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.details-item {
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.details-icon {
+    flex: 0 0 auto;
+    background: var(--surface-primary);
+    border: 1px solid var(--border-color);
+}
+
+.details-text label {
+    display: block;
+}
+
+.details-text span {
+    display: block;
+    margin-top: 4px;
+}
+
+.opps-details-actions {
+    flex-wrap: wrap;
+}
+
+.opps-details-actions .action-button {
+    align-self: flex-start;
+}
+
+.opps-view-location-row {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    max-width: none;
+}
+
+.opps-admin-moderation {
+    margin-top: 0;
+    display: grid;
+    gap: 14px;
+}
+
+.opps-admin-moderation-actions {
+    align-items: flex-start;
 }
 
 /* Modal Overlay */
@@ -891,6 +1222,40 @@ button.details-edit-btn:hover,
     resize: vertical;
 }
 
+.opps-location-hint {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.opps-form .btn {
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 14px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.opps-form .btn-secondary {
+    background: #F3F4F6;
+    border-color: #E5E7EB;
+    color: #1F2937;
+}
+
+.opps-form .btn-secondary:hover {
+    background: #E5E7EB;
+}
+
+.opps-form .btn-primary {
+    background: var(--primary);
+    color: #fff;
+}
+
+.opps-form .btn-primary:hover {
+    background: #06a874;
+}
+
 /* Upload preview styling: contain the image and avoid zoom/cropping */
 .upload-container {
     display: flex;
@@ -967,12 +1332,7 @@ button.details-edit-btn:hover,
     position: absolute;
     top: 20px;
     left: 20px;
-    background: white;
-    color: var(--text-main);
-    border: none;
-    padding: 8px 12px;
-    border-radius: 8px;
-    cursor: pointer;
+    z-index: 2;
 }
 
 /* Responsiveness */
@@ -981,6 +1341,7 @@ button.details-edit-btn:hover,
         grid-template-columns: repeat(2, 1fr);
     }
 
+    .opps-details-top-content,
     .opps-details-layout {
         grid-template-columns: 1fr;
         gap: 40px;
@@ -1012,6 +1373,19 @@ button.details-edit-btn:hover,
 
     .opps-details-header h3 {
         font-size: 28px;
+    }
+
+    .opps-details-panel {
+        padding: 20px;
+    }
+
+    .opps-details-hero-main {
+        width: 100%;
+    }
+
+    .opps-details-hero-side {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 
@@ -1061,6 +1435,312 @@ button.details-edit-btn:hover,
     transform: scale(1.05);
 }
 
+/* Ensure shared button style fits the opportunities details footer */
+.opps-details-footer-btns .button {
+    margin: 0;
+    left: 0;
+    transform: none;
+    width: auto;
+    min-width: 220px;
+    padding: 12px 24px;
+}
+
+.opps-details-footer-btns .button:hover {
+    transform: scale(1.05);
+}
+
+.opps-details-side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.opps-details-side-head h4 {
+    margin: 0;
+}
+
+.opps-report-menu-wrap {
+    position: relative;
+}
+
+.opps-report-menu-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid #dbe4ee;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.opps-report-menu-trigger:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+.opps-report-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 148px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    padding: 8px;
+    z-index: 6;
+}
+
+.opps-report-menu-item {
+    width: 100%;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: #b91c1c;
+    cursor: pointer;
+}
+
+.opps-report-menu-item:hover {
+    background: #fef2f2;
+}
+
+.opps-report-btn,
+.opps-report-primary {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.opps-report-btn:hover,
+.opps-report-primary:hover {
+    background: #b91c1c;
+    color: #ffffff;
+}
+
+.opps-report-secondary {
+    background: #ffffff;
+    color: #dc2626;
+    border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.opps-report-secondary:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.opps-report-close {
+    background: #eef2f7;
+    color: #334155;
+    border: 1px solid #dbe4ee;
+}
+
+.opps-report-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.opps-report-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: opps-report-fade-in 0.22s ease;
+}
+
+.opps-report-overlay.closing {
+    animation: opps-report-fade-out 0.22s ease forwards;
+}
+
+.opps-report-modal {
+    width: min(680px, 100%);
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+    overflow: hidden;
+    transform: scale(1);
+    animation: opps-report-scale-in 0.22s ease;
+}
+
+.opps-report-modal.closing {
+    animation: opps-report-scale-out 0.22s ease forwards;
+}
+
+.opps-report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 24px 26px 18px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.opps-report-header h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.opps-report-header p {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.opps-report-body {
+    display: grid;
+    gap: 14px;
+    padding: 24px 26px 10px;
+}
+
+.opps-report-label {
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.opps-report-input,
+.opps-report-select {
+    width: 100%;
+    border: 1px solid #dbe4ee;
+    border-radius: 14px;
+    padding: 13px 15px;
+    font-size: 15px;
+    color: #0f172a;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.opps-report-input:focus,
+.opps-report-select:focus {
+    border-color: #08c18a;
+    box-shadow: 0 0 0 4px rgba(8, 193, 138, 0.12);
+}
+
+.opps-report-input.error {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.08);
+}
+
+.opps-report-select.error {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.08);
+}
+
+.opps-report-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.opps-report-chip {
+    border: 1px solid #dbe4ee;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.opps-report-chip:hover {
+    background: #eef2f7;
+    border-color: #cbd5e1;
+}
+
+.opps-report-chip.active {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #b91c1c;
+}
+
+.opps-report-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.opps-report-duration {
+    display: grid;
+    gap: 10px;
+}
+
+.opps-report-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding: 18px 26px 26px;
+}
+
+.opps-modal-action-btn {
+    width: auto;
+    min-width: 160px;
+}
+
+@keyframes opps-report-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes opps-report-fade-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes opps-report-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes opps-report-scale-out {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0);
+    }
+}
+
 @media (max-width: 600px) {
     .opps-details-footer-btns {
         flex-direction: column;
@@ -1069,6 +1749,29 @@ button.details-edit-btn:hover,
 
     .opps-details-footer-btns .apply-btn {
         width: 90%;
+    }
+
+    .opps-details-footer-btns .button {
+        width: 90%;
+    }
+
+    .opps-report-actions {
+        flex-direction: column;
+    }
+
+    .opps-report-actions .button {
+        width: 100%;
+    }
+
+    .opps-details-summary-grid,
+    .opps-details-actions,
+    .opps-admin-moderation-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .opps-details-actions .action-button,
+    .opps-admin-moderation-actions .action-button {
+        width: 100%;
     }
 }
 
@@ -1197,4 +1900,124 @@ button.details-edit-btn:hover,
     .opp-applicants-heading-row {
         display: none;
     }
+}
+
+html.dark .opportunities-page {
+    color: var(--text-primary);
+}
+
+html.dark .opps-title,
+html.dark .opps-card-title,
+html.dark .opps-details-top-block h3,
+html.dark .opps-create-header h3,
+html.dark .opps-report-header h3,
+html.dark .opps-admin-moderation-copy strong,
+html.dark .opp-applicants-opp-title {
+    color: var(--text-primary);
+}
+
+html.dark .opps-subtitle,
+html.dark .opps-card-text,
+html.dark .meta-item,
+html.dark .posted,
+html.dark .opps-details-subtitle,
+html.dark .opps-location-hint,
+html.dark .upload-status,
+html.dark .opp-applicants-location,
+html.dark .opp-applicants-empty,
+html.dark .opps-report-chip {
+    color: var(--text-secondary);
+}
+
+html.dark .opps-search-bar,
+html.dark .opps-filter-bar,
+html.dark .composite-btn,
+html.dark .opps-composite-filter .composite-label,
+html.dark .opps-composite-filter .menu-item,
+html.dark .opps-composite-filter .menu-group,
+html.dark .opps-create-modal,
+html.dark .opps-details-panel,
+html.dark .opps-details-side,
+html.dark .opp-applicants-view,
+html.dark .opps-details-description p,
+html.dark .skill-item,
+html.dark .details-icon,
+html.dark .opps-create-header,
+html.dark .opps-form .btn-secondary,
+html.dark .upload-preview,
+html.dark .opps-report-menu-trigger,
+html.dark .opps-report-menu,
+html.dark .opps-report-modal,
+html.dark .opps-report-input,
+html.dark .opps-report-select,
+html.dark .opps-report-chip,
+html.dark .opp-applicants-table,
+html.dark .opps-create-overlay {
+    background: rgba(10, 15, 23, 0.72);
+}
+
+html.dark .opps-details-image-placeholder {
+    background: var(--surface-secondary);
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+html.dark .opps-form .btn-secondary:hover,
+html.dark .opps-report-menu-trigger:hover,
+html.dark .opps-report-chip:hover,
+html.dark .opp-applicants-row:not(.opp-applicants-heading-row):hover {
+    background: var(--surface-hover);
+}
+
+html.dark .opps-create-header,
+html.dark .opps-report-header,
+html.dark .opps-view-location-row,
+html.dark .opps-admin-moderation,
+html.dark .opp-applicants-row {
+    border-color: var(--border-color);
+}
+
+html.dark .opps-form .form-row label,
+html.dark .opps-report-label,
+html.dark .opps-report-checkbox,
+html.dark .details-text span,
+html.dark .opp-applicants-col,
+html.dark .opps-report-menu-trigger svg {
+    color: var(--text-primary);
+}
+
+html.dark .opps-form .form-row input,
+html.dark .opps-form .form-row select,
+html.dark .opps-form .form-row textarea,
+html.dark .opps-report-input,
+html.dark .opps-report-select {
+    background: var(--surface-secondary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+html.dark .opps-form .form-row input::placeholder,
+html.dark .opps-form .form-row textarea::placeholder,
+html.dark .opps-report-input::placeholder {
+    color: var(--text-disabled);
+}
+
+html.dark .opps-details-description p,
+html.dark .skill-item {
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+}
+
+html.dark .opps-report-close {
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+html.dark .opps-report-close:hover {
+    color: var(--primary);
+}
+
+html.dark .opps-report-menu-item:hover {
+    background: var(--surface-danger-soft);
 }

@@ -16,11 +16,12 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
 import TypingLoader from './TypingLoader';
-import { useLocation } from "react-router-dom";
-import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import "../styles/NavbarComponents-styles/Messages.css";
-import socket from "../Services/socket";
+import socket from "../services/socket";
 import { useMe, API_BASE } from "../Services/useMe";
 import MessageBox from "./MessageBox";
 
@@ -32,6 +33,22 @@ const fetcher = (url) =>
     if (!r.ok) throw new Error("fetch failed");
     return r.json();
   });
+
+const MESSAGE_SUBJECTS = new Set([
+  "User Report",
+  "ACCOUNT SUSPENSION",
+  "ACCOUNT RESTRICTION",
+]);
+
+function getStructuredMessageSubject(content = "") {
+  const firstLine = String(content)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  if (!firstLine) return "";
+  return MESSAGE_SUBJECTS.has(firstLine) ? firstLine : "";
+}
 
 function fmtTime(ts) {
   if (!ts) return "";
@@ -109,7 +126,10 @@ function DateSeparator({ label }) {
 ───────────────────────────────────────────── */
 function ChatItem({ conv, isActive, onClick, onlineUsers, typingUsers }) {
   const isOnline = onlineUsers.has(conv.otherUserId);
-  const preview = conv.lastMessage?.content || "No messages yet";
+  const preview =
+    getStructuredMessageSubject(conv.lastMessage?.content || "") ||
+    conv.lastMessage?.content ||
+    "No messages yet";
   const isTyping = typingUsers && typingUsers[conv._id];
   return (
     <div
@@ -127,8 +147,8 @@ function ChatItem({ conv, isActive, onClick, onlineUsers, typingUsers }) {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: "#08C18A",
-              border: "2px solid #fff",
+              background: "var(--primary)",
+              border: "2px solid var(--surface-primary)",
             }}
           />
         )}
@@ -146,7 +166,7 @@ function ChatItem({ conv, isActive, onClick, onlineUsers, typingUsers }) {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: "#08C18A",
+              background: "var(--primary)",
               marginRight: 8,
               verticalAlign: "middle",
             }}
@@ -166,7 +186,7 @@ function ChatItem({ conv, isActive, onClick, onlineUsers, typingUsers }) {
 /* ─────────────────────────────────────────────
    MessageRow — renders one message with the dropdown
 ───────────────────────────────────────────── */
-function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
+function MessageRow({ msg, isSent, myId, onDelete, isLastSent, showNotification }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef();
 
@@ -181,6 +201,11 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
 
   const hasAttachments = msg.attachments && msg.attachments.length > 0;
   const att = hasAttachments ? msg.attachments[0] : null;
+  const handleAttachmentDownload = async (url, fileName, successMessage) => {
+    const ok = await downloadFile(url, fileName);
+    showNotification(ok ? successMessage : "Download failed", ok ? "success" : "error");
+    setOpen(false);
+  };
 
   return (
     <div className={`msg-row ${isSent ? "sent" : "received"} msg-fade-in`}>
@@ -202,11 +227,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   {att?.type === "image" && (
                     <button
                       className="msg-dropdown-item"
-                      onClick={() => {
-                        downloadFile(att.url, att.fileName || "image.jpg");
-                        setOpen(false);
-                        showNotification("Image downloaded", "success");
-                      }}
+                      onClick={() => handleAttachmentDownload(att.url, att.fileName || "image.jpg", "Image downloaded")}
                     >
                       <DownloadIcon /> Download Image
                     </button>
@@ -214,11 +235,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   {att?.type === "file" && (
                     <button
                       className="msg-dropdown-item"
-                      onClick={() => {
-                        downloadFile(att.url, att.fileName || "document");
-                        setOpen(false);
-                        showNotification("File downloaded", "success");
-                      }}
+                      onClick={() => handleAttachmentDownload(att.url, att.fileName || "document", "File downloaded")}
                     >
                       <DownloadIcon /> Download File
                     </button>
@@ -226,11 +243,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   {att?.type === "audio" && (
                     <button
                       className="msg-dropdown-item"
-                      onClick={() => {
-                        downloadFile(att.url, att.fileName || "audio.mp3");
-                        setOpen(false);
-                        showNotification("Audio downloaded", "success");
-                      }}
+                      onClick={() => handleAttachmentDownload(att.url, att.fileName || "audio.mp3", "Audio downloaded")}
                     >
                       <DownloadIcon /> Download Audio
                     </button>
@@ -282,9 +295,10 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   fileName={att.fileName}
                   size={att.size}
                   isSent={isSent}
+                  onDownload={handleAttachmentDownload}
                 />
               )}
-              {msg.content && <span>{msg.content}</span>}
+              {msg.content && <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>}
             </div>
           </div>
 
@@ -303,11 +317,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   {att?.type === "image" && (
                     <button
                       className="msg-dropdown-item"
-                      onClick={() => {
-                        downloadFile(att.url, att.fileName || "image.jpg");
-                        setOpen(false);
-                        showNotification("Image downloaded", "success");
-                      }}
+                      onClick={() => handleAttachmentDownload(att.url, att.fileName || "image.jpg", "Image downloaded")}
                     >
                       <DownloadIcon /> Download Image
                     </button>
@@ -315,11 +325,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   {att?.type === "file" && (
                     <button
                       className="msg-dropdown-item"
-                      onClick={() => {
-                        downloadFile(att.url, att.fileName || "document");
-                        setOpen(false);
-                        showNotification("File downloaded", "success");
-                      }}
+                      onClick={() => handleAttachmentDownload(att.url, att.fileName || "document", "File downloaded")}
                     >
                       <DownloadIcon /> Download File
                     </button>
@@ -327,11 +333,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
                   {att?.type === "audio" && (
                     <button
                       className="msg-dropdown-item"
-                      onClick={() => {
-                        downloadFile(att.url, att.fileName || "audio.mp3");
-                        setOpen(false);
-                        showNotification("Audio downloaded", "success");
-                      }}
+                      onClick={() => handleAttachmentDownload(att.url, att.fileName || "audio.mp3", "Audio downloaded")}
                     >
                       <DownloadIcon /> Download Audio
                     </button>
@@ -377,7 +379,7 @@ function MessageRow({ msg, isSent, myId, onDelete, isLastSent }) {
               style={{
                 fontSize: 10,
                 marginLeft: 4,
-                color: "#333",
+                color: "var(--text-secondary)",
                 fontWeight: 600,
               }}
             >
@@ -471,7 +473,7 @@ function AudioAttachment({ url, isSent }) {
 }
 
 /* ─── Document Attachment ─── */
-function DocAttachment({ url, fileName, size, isSent }) {
+function DocAttachment({ url, fileName, size, isSent, onDownload }) {
   const fmtSize = size
     ? size > 1048576
       ? `${(size / 1048576).toFixed(1)} MB`
@@ -488,7 +490,13 @@ function DocAttachment({ url, fileName, size, isSent }) {
       </div>
       <button
         className="msg-doc-dl-btn"
-        onClick={() => downloadFile(url, fileName || "document")}
+        onClick={() => {
+          if (onDownload) {
+            onDownload(url, fileName || "document", "File downloaded");
+            return;
+          }
+          downloadFile(url, fileName || "document");
+        }}
         title="Download"
       >
         <DownloadIcon />
@@ -498,28 +506,33 @@ function DocAttachment({ url, fileName, size, isSent }) {
 }
 
 /* ─── download helper ─── */
-function downloadFile(url, fileName) {
+async function downloadFile(url, fileName) {
   try {
-    fetch(url, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error('fetch-failed');
-        return res.blob();
-      })
-      .then((blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = fileName || '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-      })
-      .catch(() => {
-        try { window.open(url, '_blank'); } catch (e) { /* ignore */ }
-      });
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new Error("fetch-failed");
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = fileName || "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    return true;
   } catch (e) {
-    try { window.open(url, '_blank'); } catch (err) { /* ignore */ }
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || "";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return true;
+    } catch (err) {
+      return false;
+    }
   }
 }
 
@@ -528,9 +541,11 @@ function downloadFile(url, fileName) {
 ═══════════════════════════════════════════════════════════════ */
 const Messages = () => {
   const { data: me } = useMe();
+  const isAdmin = me?.role === "admin";
   const myId = me?._id || me?.id || "";
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [activeConv, setActiveConv] = useState(null); // full conversation object
   const [inputText, setInputText] = useState("");
@@ -547,25 +562,32 @@ const Messages = () => {
   const [notification, setNotification] = useState({ open: false, message: "", type: "info", closing: false });
   const [imageModal, setImageModal] = useState({ open: false, url: "", fileName: "" });
   const [manualSeparators, setManualSeparators] = useState({}); // { convId: Set<dateStr> }
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiTheme, setEmojiTheme] = useState(() =>
+    document.documentElement.classList.contains("dark") ? EmojiTheme.DARK : EmojiTheme.LIGHT
+  );
   const typingTimer = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+  const emojiButtonRef = useRef(null);
   const preserveScrollRef = useRef({ active: false, prevScrollHeight: 0, prevScrollTop: 0 });
   const shouldScrollRef = useRef(true);
-  const prevPagesCountRef = useRef(0);
   const prevMessagesLenRef = useRef(0);
+  const handledRouteOpenRef = useRef("");
 
   // Announce presence: user is viewing the Messages page
   useEffect(() => {
     try {
       socket.emit("presence:in-messages", true);
       window.__IN_MESSAGES = true;
-    } catch (e) {}
+    } catch (e) { }
     return () => {
       try {
         socket.emit("presence:in-messages", false);
         window.__IN_MESSAGES = false;
-      } catch (e) {}
+      } catch (e) { }
     };
   }, []);
 
@@ -582,10 +604,37 @@ const Messages = () => {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape' && imageModal.open) setImageModal({ open: false, url: "", fileName: "" });
+      if (e.key === "Escape") setShowEmojiPicker(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [imageModal.open]);
+
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setEmojiTheme(
+        document.documentElement.classList.contains("dark") ? EmojiTheme.DARK : EmojiTheme.LIGHT
+      );
+    };
+
+    handleThemeChange();
+    window.addEventListener("themechange", handleThemeChange);
+    return () => window.removeEventListener("themechange", handleThemeChange);
+  }, []);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+
+    const handleClickOutside = (event) => {
+      const target = event.target;
+      if (emojiPickerRef.current && emojiPickerRef.current.contains(target)) return;
+      if (emojiButtonRef.current && emojiButtonRef.current.contains(target)) return;
+      setShowEmojiPicker(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showEmojiPicker]);
 
   // Expose the currently-open conversation globally so other UI (Topbar)
   // can suppress notifications for messages that belong to the open chat.
@@ -593,12 +642,16 @@ const Messages = () => {
     try {
       if (activeConv && activeConv._id) window.__ACTIVE_CONV_ID = String(activeConv._id);
       else window.__ACTIVE_CONV_ID = null;
-    } catch (e) {}
+    } catch (e) { }
     return () => {
       try {
         window.__ACTIVE_CONV_ID = null;
-      } catch (e) {}
+      } catch (e) { }
     };
+  }, [activeConv && activeConv._id]);
+
+  useEffect(() => {
+    setShowEmojiPicker(false);
   }, [activeConv && activeConv._id]);
 
   /* ────────── React Query: Conversations ────────── */
@@ -626,44 +679,31 @@ const Messages = () => {
             old.map((c) => (convIds.has(String(c._id)) ? { ...c, _hasUnread: true } : c))
           );
         }
-      } catch (e) {}
+      } catch (e) { }
     };
     markUnreadFromNotifications();
   }, [conversations.length]);
 
   /* ────────── React Query: Messages ────────── */
-  const {
-    data,
-    fetchNextPage,
-    isFetchingNextPage,
-    hasNextPage,
-  } = useInfiniteQuery({
+  const { data = [] } = useQuery({
     queryKey: ["messages", activeConv?._id],
-    queryFn: async ({ pageParam = null }) => {
-      if (!activeConv) return [];
-      const url = `${API}/messages?conversationId=${activeConv._id}&limit=25${pageParam ? `&cursor=${pageParam}` : ""}`;
-      return fetcher(url);
-    },
+    queryFn: () =>
+      fetcher(`${API}/messages?conversationId=${activeConv._id}`),
     enabled: !!activeConv,
     staleTime: Infinity,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage || lastPage.length === 0) return undefined;
-      return lastPage[0]?.timestamp || undefined;
-    },
-    initialPageParam: null,
   });
 
-  // Expose a flat messages array for the UI (must remain a flat array)
-  const messages = data?.pages?.flatMap((page) => page) ?? [];
+  // Expose messages array (already oldest -> newest from server)
+  const messages = data || [];
 
   /* ────────── User Search ────────── */
   const { data: searchResults = [] } = useQuery({
     queryKey: ["userSearch", searchQuery],
     queryFn: () =>
-      searchQuery.trim().length >= 1
+      !isAdmin && searchQuery.trim().length >= 1
         ? fetcher(`${API}/users/search?q=${encodeURIComponent(searchQuery)}`)
         : [],
-    enabled: searchQuery.trim().length >= 1,
+    enabled: !isAdmin && searchQuery.trim().length >= 1,
     staleTime: 10_000,
   });
 
@@ -708,7 +748,7 @@ const Messages = () => {
       if (doScroll) {
         messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
       }
-    } catch (e) {}
+    } catch (e) { }
     // reset to default (no auto-scroll) after handling
     shouldScrollRef.current = false;
 
@@ -720,7 +760,7 @@ const Messages = () => {
   useEffect(() => {
     try {
       shouldScrollRef.current = "auto";
-    } catch (e) {}
+    } catch (e) { }
   }, [activeConv && activeConv._id]);
 
   /* ────────── Scroll when typing indicator appears ────────── */
@@ -731,54 +771,10 @@ const Messages = () => {
       if (isTyping) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [typingUsers, activeConv && activeConv._id]);
 
-  /*
-    Ensure infinite-query pages are ordered oldest -> newest.
-    useInfiniteQuery appends fetched pages to the end; when fetching older
-    pages we want them at the beginning so flatMap yields oldest..newest.
-    Detect when a new page was added (pages length increased) and rotate
-    the last page to the front. This preserves the newest page as the last
-    element so socket appends (which push to last page) still place new
-    messages at the bottom.
-  */
-  useEffect(() => {
-    try {
-      if (!activeConv || !data || !data.pages) {
-        prevPagesCountRef.current = 0;
-        return;
-      }
-      const key = ["messages", activeConv._id];
-      const currCount = data.pages.length;
-      const prevCount = prevPagesCountRef.current || 0;
-      if (currCount > prevCount) {
-        // A new page was added — rotate the last page to the front unless
-        // there is only one page.
-        const old = queryClient.getQueryData(key);
-        if (!old) {
-          prevPagesCountRef.current = currCount;
-          return;
-        }
-        const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-        if (!norm.pages || norm.pages.length < 2) {
-          prevPagesCountRef.current = norm.pages ? norm.pages.length : 0;
-          return;
-        }
-        const lastIdx = norm.pages.length - 1;
-        const lastPage = norm.pages[lastIdx];
-        const lastParam = norm.pageParams ? norm.pageParams[lastIdx] : undefined;
-        const pages = [lastPage, ...norm.pages.slice(0, lastIdx)];
-        const pageParams = norm.pageParams ? [lastParam, ...norm.pageParams.slice(0, lastIdx)] : undefined;
-        queryClient.setQueryData(key, (oldVal) => ({ ...(Array.isArray(oldVal) ? { pages: [oldVal], pageParams: [null] } : oldVal), pages, pageParams }));
-        prevPagesCountRef.current = pages.length;
-      } else {
-        prevPagesCountRef.current = currCount;
-      }
-    } catch (e) {
-      prevPagesCountRef.current = data && data.pages ? data.pages.length : 0;
-    }
-  }, [data?.pages?.length, activeConv && activeConv._id]);
+
 
   /* ────────── Ensure fresh messages are loaded when opening a conversation ────────── */
   useEffect(() => {
@@ -788,7 +784,7 @@ const Messages = () => {
       // fetches the latest messages that may have arrived while the user
       // was not on the Messages page.
       queryClient.invalidateQueries(["messages", String(activeConv._id)]);
-    } catch (e) {}
+    } catch (e) { }
   }, [activeConv && activeConv._id]);
 
   /* ────────── Mark messages seen when opening/switching conversations ────────── */
@@ -806,16 +802,16 @@ const Messages = () => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId: String(activeConv._id) }),
-        }).catch(() => {});
-      } catch (e) {}
+        }).catch(() => { });
+      } catch (e) { }
       // Remove unread marker locally
       try {
         queryClient.setQueryData(['conversations'], (old = []) =>
           old.map((c) => (String(c._id) === String(activeConv._id) ? { ...c, _hasUnread: false } : c))
         );
-      } catch (e) {}
-      shouldScrollRef.current = true;
-    } catch (e) {}
+      } catch (e) { }
+      shouldScrollRef.current = "auto";
+    } catch (e) { }
   }, [activeConv]);
 
   /* ────────── Socket event handlers ────────── */
@@ -825,22 +821,18 @@ const Messages = () => {
       const convId = String(msg.conversationId);
 
       // Update messages cache if it's the open conversation
-          queryClient.setQueryData(["messages", convId], (old) => {
-            if (!old) return { pages: [[msg]], pageParams: [null] };
-            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-            const lastIdx = norm.pages.length - 1;
-            const exists = norm.pages[lastIdx].some((m) => String(m._id) === String(msg._id));
-            if (exists) return norm;
-            const pages = norm.pages.map((p, i) => (i === lastIdx ? [...p, msg] : p));
-            return { ...norm, pages };
-          });
+      queryClient.setQueryData(["messages", convId], (old = []) => {
+        const exists = (old || []).some((m) => String(m._id) === String(msg._id));
+        if (exists) return old || [];
+        return [...(old || []), msg];
+      });
 
       try {
         const activeId = activeConv && activeConv._id ? String(activeConv._id) : null;
         if (activeId && activeId === convId) {
           shouldScrollRef.current = true;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // Update conversations list last message
       queryClient.setQueryData(["conversations"], (old = []) =>
@@ -869,7 +861,7 @@ const Messages = () => {
             old.map((c) => (String(c._id) === convId ? { ...c, _hasUnread: true } : c))
           );
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // If this message belongs to the currently open conversation, and it's
       // from the other user, immediately mark it as seen on the server so the
@@ -884,33 +876,24 @@ const Messages = () => {
     };
     /* message-status: update status field of a specific message */
     const onStatus = ({ messageId, status }) => {
-          queryClient.setQueryData(["messages", activeConv?._id], (old) => {
-            if (!old) return old;
-            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-            const pages = norm.pages.map((p) => p.map((m) => (String(m._id) === String(messageId) ? { ...m, status } : m)));
-            return { ...norm, pages };
-          });
+      queryClient.setQueryData(["messages", activeConv?._id], (old = []) => {
+        return (old || []).map((m) => (String(m._id) === String(messageId) ? { ...m, status } : m));
+      });
     };
 
     /* messages-seen: update multiple messages to "seen" */
     const onSeen = ({ conversationId, messageIds }) => {
-          queryClient.setQueryData(["messages", conversationId], (old) => {
-            if (!old) return old;
-            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-            const ids = messageIds.map(String);
-            const pages = norm.pages.map((p) => p.map((m) => (ids.includes(String(m._id)) ? { ...m, status: "seen" } : m)));
-            return { ...norm, pages };
-          });
+      queryClient.setQueryData(["messages", conversationId], (old = []) => {
+        const ids = messageIds.map(String);
+        return (old || []).map((m) => (ids.includes(String(m._id)) ? { ...m, status: "seen" } : m));
+      });
     };
 
     /* message-deleted: remove from cache */
     const onDeleted = ({ messageId, conversationId }) => {
-          queryClient.setQueryData(["messages", conversationId], (old) => {
-            if (!old) return old;
-            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-            const pages = norm.pages.map((p) => p.filter((m) => String(m._id) !== String(messageId)));
-            return { ...norm, pages };
-          });
+      queryClient.setQueryData(["messages", conversationId], (old = []) => {
+        return (old || []).filter((m) => String(m._id) !== String(messageId));
+      });
     };
 
     /* presence */
@@ -923,28 +906,28 @@ const Messages = () => {
         return s;
       });
 
-      /* new conversation created for me (recipient) — add to conversations */
-      const onConversationCreated = ({ conversation }) => {
-        if (!conversation) return;
-        // Insert at top if not present
-        queryClient.setQueryData(["conversations"], (old = []) => {
-          const exists = old.some((c) => String(c._id) === String(conversation._id));
-          const merged = exists
-            ? old.map((c) => (String(c._id) === String(conversation._id) ? { ...c, ...conversation } : c))
-            : [conversation, ...old];
-          return merged.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-        });
+    /* new conversation created for me (recipient) — add to conversations */
+    const onConversationCreated = ({ conversation }) => {
+      if (!conversation) return;
+      // Insert at top if not present
+      queryClient.setQueryData(["conversations"], (old = []) => {
+        const exists = old.some((c) => String(c._id) === String(conversation._id));
+        const merged = exists
+          ? old.map((c) => (String(c._id) === String(conversation._id) ? { ...c, ...conversation } : c))
+          : [conversation, ...old];
+        return merged.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      });
 
-        // If user currently has a temporary DM open with this otherUserId,
-        // attach the real conversation id so messages will load and UI will show it.
-        try {
-          if (activeConv && !activeConv._id && String(activeConv.otherUserId) === String(conversation.otherUserId)) {
-            setActiveConv((prev) => ({ ...(prev || {}), _id: conversation._id }));
-            // refresh conversations to populate names/metadata
-            refetchConvs();
-          }
-        } catch (e) { /* ignore */ }
-      };
+      // If user currently has a temporary DM open with this otherUserId,
+      // attach the real conversation id so messages will load and UI will show it.
+      try {
+        if (activeConv && !activeConv._id && String(activeConv.otherUserId) === String(conversation.otherUserId)) {
+          setActiveConv((prev) => ({ ...(prev || {}), _id: conversation._id }));
+          // refresh conversations to populate names/metadata
+          refetchConvs();
+        }
+      } catch (e) { /* ignore */ }
+    };
 
     /* typing */
     const onTyping = ({ conversationId }) =>
@@ -984,6 +967,7 @@ const Messages = () => {
 
   /* ────────── Select user from search → open DM (do NOT create DB conv yet) ────────── */
   const handleSelectUser = useCallback(async (user) => {
+    if (isAdmin) return;
     try {
       // Don't call the server to create the conversation yet. Open a temporary
       // direct-chat UI so the user can type — the conversation will be created
@@ -1002,14 +986,22 @@ const Messages = () => {
       // we will refetch conversations (server will emit receive-message).
       setIsSearchMode(false);
       setSearchQuery("");
-    } catch (err) {
-      console.error("open DM error:", err);
-    }
-  }, [refetchConvs]);
+    } catch (err) { }
+  }, [isAdmin, refetchConvs]);
+
+  const syncTextareaHeight = useCallback(() => {
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = "auto";
+    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+  }, []);
 
   /* ────────── Typing indicator emission ────────── */
   const handleInputChange = (e) => {
     setInputText(e.target.value);
+
+    // Auto-resize
+    syncTextareaHeight();
+
     if (!activeConv) return;
 
     if (!isTyping) {
@@ -1029,6 +1021,17 @@ const Messages = () => {
       });
     }, 1500);
   };
+
+  const handleEmojiSelect = useCallback((emojiData) => {
+    const emoji = emojiData?.emoji || "";
+    if (!emoji) return;
+
+    setInputText((prev) => `${prev}${emoji}`);
+    window.setTimeout(() => {
+      syncTextareaHeight();
+      textareaRef.current?.focus();
+    }, 0);
+  }, [syncTextareaHeight]);
 
   /* close header menu on outside click */
   useEffect(() => {
@@ -1085,7 +1088,6 @@ const Messages = () => {
         size: data.size,
       });
     } catch (err) {
-      console.error("upload error:", err);
       alert("Upload failed");
     } finally {
       setUploading(false);
@@ -1135,10 +1137,10 @@ const Messages = () => {
           return copy;
         });
       }
-    } catch (e) {}
+    } catch (e) { }
     socket.emit("send-message", payload, (response) => {
       if (response?.error) {
-        console.error("send-message error:", response.error);
+        showNotification("Message could not be sent", "error");
         return;
       }
 
@@ -1151,14 +1153,10 @@ const Messages = () => {
           // ensure activeConv has the real _id if it was created
           if (!activeConv?._id) setActiveConv((prev) => ({ ...(prev || {}), _id: convId }));
 
-          queryClient.setQueryData(["messages", convId], (old) => {
-            if (!old) return { pages: [[response.message]], pageParams: [null] };
-            const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-            const lastIdx = norm.pages.length - 1;
-            const exists = norm.pages[lastIdx].some((m) => String(m._id) === String(response.message._id));
-            if (exists) return norm;
-            const pages = norm.pages.map((p, i) => (i === lastIdx ? [...p, response.message] : p));
-            return { ...norm, pages };
+          queryClient.setQueryData(["messages", convId], (old = []) => {
+            const exists = (old || []).some((m) => String(m._id) === String(response.message._id));
+            if (exists) return old || [];
+            return [...(old || []), response.message];
           });
 
           // Refresh conversations list so the new conversation appears
@@ -1178,12 +1176,14 @@ const Messages = () => {
               }
               return copy;
             });
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     });
 
     setInputText("");
+    setShowEmojiPicker(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     setAttachmentPending(null);
     clearTimeout(typingTimer.current);
     setIsTyping(false);
@@ -1198,13 +1198,10 @@ const Messages = () => {
     (messageId) => {
       if (!activeConv) return;
       try {
-        queryClient.setQueryData(["messages", activeConv._id], (old) => {
-          if (!old) return old;
-          const norm = Array.isArray(old) ? { pages: [old], pageParams: [null] } : old;
-          const pages = norm.pages.map((p) => p.filter((m) => String(m._id) !== String(messageId)));
-          return { ...norm, pages };
+        queryClient.setQueryData(["messages", activeConv._id], (old = []) => {
+          return (old || []).filter((m) => String(m._id) !== String(messageId));
         });
-      } catch (e) {}
+      } catch (e) { }
 
       socket.emit(
         "delete-message",
@@ -1245,12 +1242,28 @@ const Messages = () => {
     try {
       const openId = location && location.state && (location.state.openConversationId || location.state.openConversation);
       const openOtherUserId = location && location.state && location.state.openConversationOtherUserId;
+      const requestKey = `${location.key || "messages"}:${openId || ""}:${openOtherUserId || ""}`;
+
+      if (!openId && !openOtherUserId) {
+        handledRouteOpenRef.current = "";
+        return;
+      }
+
+      if (handledRouteOpenRef.current === requestKey) {
+        return;
+      }
+
+      const finalizeRouteOpen = (conversation) => {
+        handledRouteOpenRef.current = requestKey;
+        setActiveConv(conversation);
+        navigate("/home/messages", { replace: true });
+      };
 
       if (openId) {
         if (conversations && conversations.length > 0) {
           const found = conversations.find((c) => String(c._id) === String(openId));
           if (found) {
-            setActiveConv(found);
+            finalizeRouteOpen(found);
             return;
           }
         }
@@ -1258,7 +1271,7 @@ const Messages = () => {
         refetchConvs().then(() => {
           const list = queryClient.getQueryData(["conversations"]) || [];
           const f = list.find((c) => String(c._id) === String(openId));
-          if (f) setActiveConv(f);
+          if (f) finalizeRouteOpen(f);
         }).catch(() => { });
         return;
       }
@@ -1268,7 +1281,7 @@ const Messages = () => {
         if (conversations && conversations.length > 0) {
           const found = conversations.find((c) => String(c.otherUserId) === String(openOtherUserId));
           if (found) {
-            setActiveConv(found);
+            finalizeRouteOpen(found);
             return;
           }
         }
@@ -1283,11 +1296,11 @@ const Messages = () => {
           lastMessage: { content: "" },
           updatedAt: new Date().toISOString(),
         };
-        setActiveConv(conv);
+        finalizeRouteOpen(conv);
         return;
       }
     } catch (e) { }
-  }, [conversations, location && location.state && (location.state.openConversationId || location.state.openConversationOtherUserId), refetchConvs, queryClient]);
+  }, [conversations, location.key, location.state, refetchConvs, queryClient, navigate]);
 
   return (
     <div className="msg-page">
@@ -1295,19 +1308,22 @@ const Messages = () => {
         <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
       )}
       {imageModal.open && (
-        <div onClick={() => setImageModal({ open: false, url: '', fileName: '' })} style={{ position: 'fixed', zIndex: 99999, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <button onClick={(e) => { e.stopPropagation(); setImageModal({ open: false, url: '', fileName: '' }); }} style={{ position: 'absolute', top: 18, left: 18, zIndex: 100000, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', padding: '8px 12px', borderRadius: 6, cursor: 'pointer' }}>Back</button>
-          <img onClick={(e) => e.stopPropagation()} src={imageModal.url} alt={imageModal.fileName || 'image'} style={{ maxWidth: '95%', maxHeight: '92%', boxShadow: '0 6px 24px rgba(0,0,0,0.6)' }} />
+        <div className="msg-image-modal" onClick={() => setImageModal({ open: false, url: '', fileName: '' })}>
+          <button className="msg-image-modal-back" onClick={(e) => { e.stopPropagation(); setImageModal({ open: false, url: '', fileName: '' }); }}>Back</button>
+          <img className="msg-image-modal-image" onClick={(e) => e.stopPropagation()} src={imageModal.url} alt={imageModal.fileName || 'image'} />
         </div>
       )}
       {/* ═══════════ LEFT PANEL ═══════════ */}
       <div className="msg-left-panel">
         <div className="msg-panel-header">
-          <h2>Messages</h2>
-          <p>{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</p>
+          <h2>{isAdmin ? "User Reports" : "Messages"}</h2>
+          <p>
+            {conversations.length} {isAdmin ? "user" : "conversation"}
+            {conversations.length !== 1 ? "s" : ""}
+          </p>
         </div>
 
-        {isSearchMode ? (
+        {isSearchMode && !isAdmin ? (
           /* ─── Search Mode ─── */
           <div className="msg-search-panel">
             <div className="msg-search-header">
@@ -1335,7 +1351,7 @@ const Messages = () => {
                       background: "none",
                       border: "none",
                       cursor: "pointer",
-                      color: "#b0bab7",
+                      color: "var(--text-muted)",
                       padding: 0,
                     }}
                     onClick={() => setSearchQuery("")}
@@ -1372,7 +1388,7 @@ const Messages = () => {
                     </div>
                   </div>
                   <span
-                    style={{ fontSize: 12, color: "#08C18A", fontWeight: 600 }}
+                    style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}
                   >
                     Chat
                   </span>
@@ -1396,19 +1412,21 @@ const Messages = () => {
               ))}
               {conversations.length === 0 && (
                 <div className="msg-search-empty">
-                  <p>No conversations yet. Start one!</p>
+                  <p>{isAdmin ? "User reports will appear here." : "No conversations yet. Start one!"}</p>
                 </div>
               )}
             </div>
 
             {/* Floating New Chat Button */}
-            <button
-              className="msg-new-chat-btn"
-              onClick={() => setIsSearchMode(true)}
-              title="New Chat"
-            >
-              <PenIcon />
-            </button>
+            {!isAdmin && (
+              <button
+                className="msg-new-chat-btn"
+                onClick={() => setIsSearchMode(true)}
+                title="New Chat"
+              >
+                <PenIcon />
+              </button>
+            )}
           </>
         )}
       </div>
@@ -1416,12 +1434,12 @@ const Messages = () => {
       {/* ═══════════ RIGHT PANEL ═══════════ */}
       <div className="msg-right-panel">
         {!activeConv ? (
-          <div className="msg-empty-state">
-            <div className="empty-icon">
-              <ChatBubbleIcon />
-            </div>
-            <h3>Your Messages</h3>
-            <p>Select a conversation or start a new one</p>
+            <div className="msg-empty-state">
+              <div className="empty-icon">
+                <ChatBubbleIcon />
+              </div>
+            <h3>{isAdmin ? "User Reports" : "Your Messages"}</h3>
+            <p>{isAdmin ? "Select a user to review admin reports." : "Select a conversation or start a new one"}</p>
           </div>
         ) : (
           <>
@@ -1465,32 +1483,7 @@ const Messages = () => {
 
             {/* ─── Messages Area ─── */}
             <div className="msg-messages-area">
-              {/* Load more (cursor pagination) */}
-              {hasNextPage && (
-                <div style={{ textAlign: "center", marginBottom: 8 }}>
-                  <button
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#08C18A",
-                      cursor: "pointer",
-                      fontSize: 13,
-                    }}
-                    onClick={() => {
-                      // disable auto-scroll (ensure we don't jump to bottom)
-                      shouldScrollRef.current = false;
-                      const area = messagesEndRef.current && messagesEndRef.current.parentElement;
-                      if (area) {
-                        preserveScrollRef.current = { active: true, prevScrollHeight: area.scrollHeight, prevScrollTop: area.scrollTop };
-                      }
-                      fetchNextPage();
-                    }}
-                    disabled={isFetchingNextPage}
-                  >
-                    {isFetchingNextPage ? "Loading…" : "Load older messages"}
-                  </button>
-                </div>
-              )}
+
 
               {
                 (() => {
@@ -1513,6 +1506,7 @@ const Messages = () => {
                         myId={myId}
                         onDelete={handleDelete}
                         isLastSent={isSent && i === lastSentIdx}
+                        showNotification={showNotification}
                       />
                     );
                     prevDate = curDate;
@@ -1535,7 +1529,7 @@ const Messages = () => {
                         }
                       }
                     }
-                  } catch (e) {}
+                  } catch (e) { }
 
                   return nodes;
                 })()
@@ -1561,8 +1555,8 @@ const Messages = () => {
               <div
                 style={{
                   padding: "6px 16px",
-                  background: "#edfaf5",
-                  borderTop: "1px solid #d0eae3",
+                  background: "var(--surface-accent)",
+                  borderTop: "1px solid var(--border-accent)",
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
@@ -1586,7 +1580,7 @@ const Messages = () => {
                 )}
                 <button
                   onClick={() => setAttachmentPending(null)}
-                  style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#e53935" }}
+                  style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--danger)" }}
                 >
                   <XIcon />
                 </button>
@@ -1602,25 +1596,54 @@ const Messages = () => {
                 accept=".jpg,.jpeg,.png,.webp,.mp3,.pdf,.doc,.docx,.zip"
                 onChange={handleFileChange}
               />
-              <div className="msg-input-wrap">
-                <button className="msg-emoji-btn" title="Emoji">
-                  <EmojiIcon />
-                </button>
-                <input
+              <div className="msg-input-compose">
+                {showEmojiPicker && (
+                  <div className="msg-emoji-popover" ref={emojiPickerRef}>
+                    <EmojiPicker
+                      onEmojiClick={handleEmojiSelect}
+                      theme={emojiTheme}
+                      width="100%"
+                      height={360}
+                      lazyLoadEmojis={true}
+                      previewConfig={{ showPreview: false }}
+                    />
+                  </div>
+                )}
+                <div className="msg-input-wrap">
+                  <button
+                    ref={emojiButtonRef}
+                    className="msg-emoji-btn"
+                    title="Emoji"
+                    type="button"
+                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                  >
+                    <EmojiIcon />
+                  </button>
+                <textarea
+                  ref={textareaRef}
                   placeholder={uploading ? "Uploading…" : "Type a message…"}
                   value={inputText}
                   disabled={uploading}
                   onChange={handleInputChange}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  rows={1}
+                  className="msg-input-field"
                 />
                 <button
                   className="msg-attach-btn"
                   title="Attach file"
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
                   <AttachIcon />
                 </button>
+              </div>
               </div>
               <button
                 className="msg-send-btn"

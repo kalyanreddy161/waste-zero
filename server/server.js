@@ -13,15 +13,16 @@ const opportunitiesRoutes = require("./routes/OpportunitiesRoutes");
 const applicationRoutes = require("./routes/ApplicationRoutes");
 const notificationRoutes = require("./routes/NotificationRoutes");
 const uploadRoutes = require("./routes/UploadRoutes");
-const pickupRoutes = require("./routes/pickupRoutes"); // ✅ added
 const messageRoutes = require("./routes/MessageRoutes"); // ← NEW
 
 // Chat models used directly in the socket handler
 const Message = require("./models/Message");         // ← NEW
 const Conversation = require("./models/Conversation"); // ← NEW
 const User = require("./models/User");
+const { runModerationExpirySweep } = require("./services/moderationStatusService");
 
 const app = express();
+const MODERATION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 /* ======================
    MIDDLEWARE
@@ -87,8 +88,8 @@ app.use(notificationRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api/chat", messageRoutes); // ← NEW: all chat REST endpoints
 // Push subscription endpoints
-app.use("/api/pickups", pickupRoutes); 
 app.use('/api/push', require('./routes/PushRoutes'));
+app.use('/pickup', require('./routes/ScheduleRoutes'));
 
 /* ======================
    HTTP SERVER + SOCKET.IO
@@ -140,6 +141,7 @@ const presence = new Map();
 // expose presence and onlineUsers for services
 global.presence = presence;
 global.onlineUsers = onlineUsers;
+global.inMessagesUsers = inMessagesUsers;
 
 function markOnline(userId, socketId) {
   if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
@@ -516,6 +518,23 @@ io.on("connection", (socket) => {
 /* expose io globally so other controllers can emit events */
 global.io = io;
 
+let moderationSweepTimer = null;
+const runModerationSweep = async () => {
+  try {
+    await runModerationExpirySweep();
+  } catch (error) {
+    console.error("[moderation-sweep] error:", error);
+  }
+};
+
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  runModerationSweep();
+  moderationSweepTimer = setInterval(runModerationSweep, MODERATION_SWEEP_INTERVAL_MS);
+});
+
+server.on("close", () => {
+  if (moderationSweepTimer) {
+    clearInterval(moderationSweepTimer);
+  }
 });

@@ -1,69 +1,123 @@
+const path = require("path");
 const nodemailer = require("nodemailer");
 
-// 1. Create the transporter (The connection to your email provider)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail",
   auth: {
-    user: 'wastezeroofficial@gmail.com',
-    pass: 'vgzk ugdr wbms bzdn' 
-  }
+    user: "wastezeroofficial@gmail.com",
+    pass: "vgzk ugdr wbms bzdn",
+  },
 });
 
-// 2. Function to generate and send the code
+const RECYCLE_ICON_CID = "wastezero-recycle-icon";
+const RECYCLE_ICON_PATH = path.join(
+  __dirname,
+  "..",
+  "..",
+  "client",
+  "public",
+  "recycle_icon.svg"
+);
+
+const BRAND_ATTACHMENTS = [
+  {
+    filename: "recycle_icon.svg",
+    path: RECYCLE_ICON_PATH,
+    cid: RECYCLE_ICON_CID,
+    contentType: "image/svg+xml",
+  },
+];
+
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const buildEmailShell = ({ title, contentHtml, footerText }) => `
+  <div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
+    <div style="max-width: 560px; margin: auto; background-color: #ffffff; padding: 24px; border-radius: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+        <img src="cid:${RECYCLE_ICON_CID}" alt="WasteZero" width="32" height="32" style="display: block;" />
+        <div>
+          <div style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800;">WasteZero</div>
+          <div style="margin-top: 2px; color: #334155; font-size: 14px; font-weight: 600;">${escapeHtml(title)}</div>
+        </div>
+      </div>
+      ${contentHtml}
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px;" />
+      <p style="color: #9ca3af; font-size: 12px; margin: 0;">${escapeHtml(footerText)}</p>
+    </div>
+  </div>
+`;
+
 async function sendVerificationEmail(userEmail) {
   const verificationCode = Math.floor(100000 + Math.random() * 900000);
 
   await transporter.sendMail({
     from: '"WasteZero" <wastezeroofficial@gmail.com>',
     to: userEmail,
-    subject: 'Your Verification Code',
+    subject: "Your Verification Code",
     text: `Your verification code is ${verificationCode}`,
-    html: `<div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
-  <div style="max-width: 480px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 6px;">
-
-    <h2 style="margin-top: 0; color: #333;">WasteZero</h2>
-
-    <p style="color: #555; font-size: 14px;">
-      Hello,
-    </p>
-
-    <p style="color: #555; font-size: 14px;">
-      Use the verification code below to complete your request.
-    </p>
-
-    <!-- OTP -->
-    <div style="text-align: center; margin: 28px 0;">
-      <h1 style="
-        margin: 0;
-        font-weight: bold;
-        letter-spacing: 8px;
-        color: #000;
-      ">
-        ${verificationCode}
-      </h1>
-    </div>
-
-    <p style="color: #555; font-size: 14px;">
-      This code is valid for <b>10 minutes</b>.
-    </p>
-
-    <p style="color: #888; font-size: 12px;">
-      ⚠️ Do not share this code with anyone. WasteZero will never ask for your verification code.
-    </p>
-
-    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-
-    <p style="color: #aaa; font-size: 11px;">
-      If you didn’t request this, you can safely ignore this email.
-    </p>
-
-  </div>
-</div>`
+    html: buildEmailShell({
+      title: "Your Verification Code",
+      contentHtml: `
+        <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 10px;">Hello,</p>
+        <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 14px;">
+          Use the verification code below to complete your request.
+        </p>
+        <div style="text-align: center; margin: 30px 0; padding: 18px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0;">
+          <div style="margin: 0; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0f172a;">
+            ${verificationCode}
+          </div>
+        </div>
+        <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 10px;">
+          This code is valid for <strong>10 minutes</strong>.
+        </p>
+        <p style="color: #64748b; font-size: 12px; line-height: 1.7; margin: 0;">
+          Do not share this code with anyone. WasteZero will never ask for your verification code.
+        </p>
+      `,
+      footerText: "If you did not request this, you can safely ignore this email.",
+    }),
+    attachments: BRAND_ATTACHMENTS,
   });
 
-  console.log(`✅ Code ${verificationCode} sent to ${userEmail}`);
-
+  console.log(`Verification code ${verificationCode} sent to ${userEmail}`);
   return verificationCode;
 }
 
-module.exports = { sendVerificationEmail };
+function buildEmailHtml(title, text) {
+  const safeTitle = title || "WasteZero";
+  const bodyHtml = String(text || "")
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return `<div style="height: 12px;"></div>`;
+      }
+      return `<p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 10px;">${escapeHtml(trimmed)}</p>`;
+    })
+    .join("");
+
+  return buildEmailShell({
+    title: safeTitle,
+    contentHtml: bodyHtml,
+    footerText: "This email was sent by WasteZero admin tools.",
+  });
+}
+
+async function sendPlainEmail({ to, subject, text }) {
+  await transporter.sendMail({
+    from: '"WasteZero" <wastezeroofficial@gmail.com>',
+    to,
+    subject,
+    text,
+    html: buildEmailHtml(subject, text),
+    attachments: BRAND_ATTACHMENTS,
+  });
+}
+
+module.exports = { sendVerificationEmail, sendPlainEmail };

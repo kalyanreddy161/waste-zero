@@ -2,10 +2,28 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLoading } from "../Services/LoadingContext";
 import { useMe, API_BASE } from "../Services/useMe";
+import {
+  clearConversationNotificationsFromCache,
+  getUnreadNotificationCount,
+  mergeNotificationIntoCache,
+  removeNotificationFromCache,
+  useNotifications,
+} from "../Services/useNotifications";
 import socket from "../services/socket";
-import pushService from "../services/pushService";
-import NotificationPanel from "./NotificationPanel";
+import pushService from "../Services/pushService";
+import NotificationPanel, {
+  formatNotification,
+  truncateNotificationPreview,
+} from "./NotificationPanel";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import {
+  DARK_THEME,
+  LIGHT_THEME,
+  resolveThemePreference,
+  setThemePreference,
+  syncThemeWithStorage,
+  syncThemeWithSystemPreference,
+} from "../Services/theme";
 import "../styles/Topbar.css";
 import MessageBox from "./MessageBox";
 import Loading from "./Loading";
@@ -17,9 +35,26 @@ import logout from "../assets/icons/logout.svg";
 import searchIcon from "../assets/icons/search.svg";
 import NotificationBell from "./NotificationBell";
 
+const MESSAGE_SUBJECTS = new Set([
+  "User Report",
+  "ACCOUNT SUSPENSION",
+  "ACCOUNT RESTRICTION",
+]);
+
+const getStructuredMessageSubject = (content = "") => {
+  const firstLine = String(content)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  if (!firstLine) return "";
+  return MESSAGE_SUBJECTS.has(firstLine) ? firstLine : "";
+};
+
 export default function Topbar() {
   const { data: me } = useMe();
   const queryClient = useQueryClient();
+  const isAdmin = me?.role === "admin";
   const initial = me?.fullName ? me.fullName.trim().charAt(0).toUpperCase() : "G";
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -27,8 +62,9 @@ export default function Topbar() {
   const { setLoading } = useLoading();
 
   const [notification, setNotification] = useState({ open: false, message: "", type: "info", closing: false });
-  const [unread, setUnread] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [theme, setTheme] = useState(() => resolveThemePreference());
+  const { data: notifications = [] } = useNotifications();
 
   // Search window state
   const [searchInput, setSearchInput] = useState("");
@@ -39,6 +75,10 @@ export default function Topbar() {
   const searchResultsRef = useRef(null);
   // Track processed notification <-> message reference IDs to avoid double-counting
   const processedNotifRefs = useRef(new Set());
+  const notificationSoundRef = useRef(null);
+  const notificationSoundUnlockedRef = useRef(false);
+  const isDarkMode = theme === DARK_THEME;
+  const unread = useMemo(() => getUnreadNotificationCount(notifications), [notifications]);
 
   const showMessage = (msg, type = "info", duration = 3000) => {
     setNotification({ open: true, message: msg, type, closing: false });
@@ -46,6 +86,126 @@ export default function Topbar() {
       setNotification((s) => ({ ...s, closing: true }));
       window.setTimeout(() => setNotification({ open: false, message: "", type: "info", closing: false }), 300);
     }, duration);
+  };
+
+  const playNotificationSound = () => {
+    const audio = notificationSoundRef.current;
+    if (!audio) return;
+
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      const maybePromise = audio.play();
+      if (maybePromise && typeof maybePromise.catch === "function") {
+        maybePromise.catch(() => {
+          try {
+            const fallbackAudio = new Audio("/notify.mp3");
+            fallbackAudio.preload = "auto";
+            fallbackAudio.play().catch(() => { });
+          } catch (fallbackError) { }
+        });
+      }
+    } catch (error) { }
+  };
+
+  const primeNotificationSound = () => {
+    const audio = notificationSoundRef.current;
+    if (!audio || notificationSoundUnlockedRef.current) return;
+
+    notificationSoundUnlockedRef.current = true;
+
+    try {
+      audio.muted = true;
+      audio.currentTime = 0;
+      const maybePromise = audio.play();
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+          })
+          .catch(() => {
+            notificationSoundUnlockedRef.current = false;
+            audio.muted = false;
+          });
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+      }
+    } catch (error) {
+      notificationSoundUnlockedRef.current = false;
+      audio.muted = false;
+    }
+  };
+
+  const shouldPlayNotificationSound = (payload) => {
+    if (!payload || !me) {
+      return false;
+    }
+
+    const myId = String(me._id || me.id || "");
+    if (payload.type) {
+      if (payload.senderId && myId && String(payload.senderId) === myId) {
+        return false;
+      }
+
+      return ["message", "application", "accepted", "rejected", "pickup_completed", "pickup_accepted"].includes(payload.type);
+    }
+
+    const senderId = payload.sender_id?._id || payload.sender_id;
+    if (senderId && myId && String(senderId) === myId) {
+      return false;
+    }
+
+    return Boolean(payload.conversationId || payload.sender_id);
+  };
+
+  useEffect(() => {
+    if (typeof Audio === "undefined") return undefined;
+
+    const audio = new Audio("/notify.mp3");
+    audio.preload = "auto";
+    try { audio.load(); } catch (e) { }
+    notificationSoundRef.current = audio;
+
+    const unlockEvents = ["pointerdown", "keydown", "touchstart"];
+    const handleUnlock = () => primeNotificationSound();
+    unlockEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleUnlock, { passive: true });
+    });
+
+    return () => {
+      unlockEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleUnlock);
+      });
+      notificationSoundRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const cleanupSystemTheme = syncThemeWithSystemPreference(setTheme);
+    const cleanupStoredTheme = syncThemeWithStorage(setTheme);
+    const onThemeChange = (event) => {
+      const nextTheme = event?.detail?.theme;
+      if (nextTheme === DARK_THEME || nextTheme === LIGHT_THEME) {
+        setTheme(nextTheme);
+      }
+    };
+
+    window.addEventListener("themechange", onThemeChange);
+
+    return () => {
+      cleanupSystemTheme();
+      cleanupStoredTheme();
+      window.removeEventListener("themechange", onThemeChange);
+    };
+  }, []);
+
+  const handleThemeToggle = (event) => {
+    const nextTheme = event.target.checked ? DARK_THEME : LIGHT_THEME;
+    setTheme(setThemePreference(nextTheme));
   };
 
   // Check sessionStorage for any global message set before navigation (e.g., login/register/logout)
@@ -60,7 +220,7 @@ export default function Topbar() {
         sessionStorage.removeItem('global_message');
       }
     } catch (e) { }
-  }, []);
+  }, [me]);
 
   // Connect socket once the user session is confirmed (works for both NGO and volunteer)
   useEffect(() => {
@@ -68,17 +228,49 @@ export default function Topbar() {
     if (!socket.connected) {
       socket.connect();
     }
-    // fetch unread count after connection is established
-    const fetchUnread = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/notifications/unread-count`, { credentials: "include" });
-        if (!res.ok) return;
-        const data = await res.json();
-        setUnread(data.unread || 0);
-      } catch (e) { }
-    };
-    fetchUnread();
   }, [me]);
+
+  useEffect(() => {
+    const handleSuspended = async (payload) => {
+      try {
+        setShowNotifications(false);
+        setOpen(false);
+        try { await pushService.unsubscribePush(); } catch (e) { }
+        socket.disconnect();
+        queryClient.clear();
+        try {
+          sessionStorage.setItem(
+            "global_message",
+            JSON.stringify({
+              message: payload?.message || "Your account has been temporarily suspended.",
+              type: "error",
+            })
+          );
+        } catch (e) { }
+      } finally {
+        navigate("/");
+      }
+    };
+
+    socket.on("account:suspended", handleSuspended);
+    return () => {
+      socket.off("account:suspended", handleSuspended);
+    };
+  }, [navigate, queryClient]);
+
+  useEffect(() => {
+    const handleAccountRefresh = () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] }).catch(() => { });
+    };
+
+    socket.on("account:status-updated", handleAccountRefresh);
+    socket.on("account:restored", handleAccountRefresh);
+
+    return () => {
+      socket.off("account:status-updated", handleAccountRefresh);
+      socket.off("account:restored", handleAccountRefresh);
+    };
+  }, [queryClient]);
 
   // Initialize push subscription and visibility handlers when socket connects
   useEffect(() => {
@@ -114,10 +306,12 @@ export default function Topbar() {
     // socket listeners for incoming notifications
     const processedIds = new Set();
     const onNew = (payload) => {
-      // deduplicate by notification ID to prevent double increments
-      if (payload && payload.id) {
-        if (processedIds.has(payload.id)) return;
-        processedIds.add(payload.id);
+      if (!payload) return;
+
+      const notificationId = payload.id || payload._id;
+      if (notificationId) {
+        if (processedIds.has(String(notificationId))) return;
+        processedIds.add(String(notificationId));
         // keep set size reasonable
         if (processedIds.size > 200) {
           const first = processedIds.values().next().value;
@@ -125,10 +319,10 @@ export default function Topbar() {
         }
       }
 
-      // If this notification references a message id that we've already
-      // processed via receive-message, skip increment to avoid double-count.
+      mergeNotificationIntoCache(queryClient, payload);
+
       try {
-        if (payload && payload.referenceId) {
+        if (payload.referenceId) {
           if (processedNotifRefs.current.has(String(payload.referenceId))) return;
           processedNotifRefs.current.add(String(payload.referenceId));
           if (processedNotifRefs.current.size > 200) {
@@ -138,7 +332,6 @@ export default function Topbar() {
         }
       } catch (e) { }
 
-      setUnread((u) => u + 1);
       // mark conversation as unread if payload includes conversationId
       try {
         const convId = payload && ((payload.meta && payload.meta.conversationId) || payload.conversationId || null);
@@ -152,12 +345,30 @@ export default function Topbar() {
       window.dispatchEvent(new CustomEvent('notify:incoming', { detail: payload }));
     };
     socket.on('notification', onNew);
+    const onNotificationRemoved = ({ id }) => {
+      if (id) {
+        removeNotificationFromCache(queryClient, id);
+      }
+    };
+    const onConversationCleared = ({ conversationId, ids }) => {
+      if (conversationId) {
+        clearConversationNotificationsFromCache(queryClient, conversationId);
+        return;
+      }
+
+      if (Array.isArray(ids)) {
+        ids.forEach((id) => removeNotificationFromCache(queryClient, id));
+      }
+    };
+    socket.on('notification:removed', onNotificationRemoved);
+    socket.on('notification:conversation-cleared', onConversationCleared);
     // Listen for conversation-level clears (Messages opened a conversation)
     const onClearConv = (ev) => {
       try {
         const convId = ev && ev.detail && ev.detail.conversationId;
-        // Decrease unread count by 1 (minimum 0) and close notifications panel
-        setUnread((u) => Math.max(0, u - 1));
+        if (convId) {
+          clearConversationNotificationsFromCache(queryClient, convId);
+        }
         // clear per-conversation unread marker
         try {
           if (convId) {
@@ -175,10 +386,12 @@ export default function Topbar() {
     return () => {
       document.removeEventListener("mousedown", handleOutside);
       socket.off('notification', onNew);
+      socket.off('notification:removed', onNotificationRemoved);
+      socket.off('notification:conversation-cleared', onConversationCleared);
       window.removeEventListener('notify:clear-conversation', onClearConv);
       window.removeEventListener('notify:close-panel', onClosePanel);
     };
-  }, []);
+  }, [queryClient]);
 
   // Show on-screen toast (MessageBox) for incoming notifications/messages
   useEffect(() => {
@@ -187,82 +400,73 @@ export default function Topbar() {
       try {
         if (!payload) return;
 
+        if (shouldPlayNotificationSound(payload)) {
+          playNotificationSound();
+        }
+
         // Notification from server (has .type) or a message object (has sender_id/conversationId)
         if (payload.type) {
-          if (payload.type === 'application') {
-            // NGO: new application arrived
-            let content = 'New application received';
-            if (payload.application_id) {
-              try {
-                const r = await fetch(`${API_BASE}/applications/${payload.application_id}`, { credentials: 'include' });
-                if (r.ok) {
-                  const app = await r.json();
-                  const t = app.opportunityId && app.opportunityId.title ? app.opportunityId.title : '';
-                  content = `New application for ${t || 'Opportunity'}`;
-                }
-              } catch (e) { }
-            }
-            setNotification({ open: true, message: { title: 'application', content, icon: 'application' }, type: 'info', closing: false });
-          } else if (payload.type === 'accepted' || payload.type === 'rejected') {
-            // Volunteer: NGO responded to application
-            let content = `Your application was ${payload.type}`;
-            if (payload.application_id) {
-              try {
-                const r = await fetch(`${API_BASE}/applications/${payload.application_id}`, { credentials: 'include' });
-                if (r.ok) {
-                  const app = await r.json();
-                  const t = app.opportunityId && app.opportunityId.title ? app.opportunityId.title : '';
-                  content = `your ${t || 'opportunity'} application is ${payload.type}.`;
-                }
-              } catch (e) { }
-            }
-            setNotification({ open: true, message: { title: 'application', content, icon: 'application' }, type: payload.type === 'accepted' ? 'success' : 'error', closing: false });
-          } else if (payload.type === 'message') {
-            // notification referencing a message
-            let senderName = (payload.meta && payload.meta.senderName) || '';
-            let contentText = (payload.meta && payload.meta.message) || '';
-            if (!contentText && payload.referenceId) {
-              try {
-                const r = await fetch(`${API_BASE}/api/chat/messages/${payload.referenceId}`, { credentials: 'include' });
-                if (r.ok) {
-                  const msg = await r.json();
-                  senderName = (msg.sender_id && msg.sender_id.fullName) || senderName || 'Someone';
-                  if (msg.attachments && msg.attachments.length > 0) {
-                    const t = msg.attachments[0].type;
-                    contentText = t === 'image' ? '📷 Photo' : t === 'audio' ? '🎵 Audio' : '📄 File';
-                  } else contentText = msg.content || '';
-                }
-              } catch (e) { }
-            }
-            const content = `${senderName ? senderName + ' : ' : ''}${contentText}`;
-            setNotification({ open: true, message: { title: 'message', content, icon: 'message' }, type: 'info', closing: false });
-          } else {
-            // fallback: show simple text
-            setNotification({ open: true, message: String(payload.meta && payload.meta.message ? payload.meta.message : (payload.message || JSON.stringify(payload))), type: 'info', closing: false });
-          }
+           if (payload.type === 'pickup_completed') {
+             setNotification({
+               open: true,
+               message: { title: 'pickup completed', content: `Your pickup is completed. Click to open.`, icon: 'pickup' },
+               type: 'success',
+               closing: false
+             });
+           } else if (payload.type === 'pickup_accepted') {
+             const ngo = payload.meta?.ngoName || 'an NGO';
+             setNotification({
+               open: true,
+               message: { title: 'your pickup is accepted', content: `Your pickup is accepted by ${ngo}.`, icon: 'pickup' },
+               type: 'info',
+               closing: false
+             });
+           } else {
+             const formatted = formatNotification(payload, me);
+             setNotification({
+               open: true,
+               message: { title: formatted.title.toLowerCase(), content: formatted.body, icon: payload.type },
+               type: payload.type === 'accepted' ? 'success' : payload.type === 'rejected' ? 'error' : 'info',
+               closing: false
+             });
+           }
         } else if (payload && (payload.conversationId || payload.sender_id)) {
           // Direct message object (from receive-message)
           const sender = payload.sender_id || {};
           const senderName = sender.fullName || sender.name || (payload.name) || 'Someone';
+          const subject = getStructuredMessageSubject(payload.content || "");
           let content = '';
-          if (payload.attachments && payload.attachments.length > 0) {
+          if (me?.role === "admin" && subject === "User Report") {
+            content = "";
+          } else if (payload.attachments && payload.attachments.length > 0) {
             const t = payload.attachments[0].type;
             content = t === 'image' ? '📷 Photo' : t === 'audio' ? '🎵 Audio' : '📄 File';
           } else content = payload.content || '';
-          setNotification({ open: true, message: { title: 'message', content: `${senderName} : ${content}`, icon: 'message' }, type: 'info', closing: false });
+          const contentPreview =
+            me?.role === "admin" && subject === "User Report"
+              ? ""
+              : truncateNotificationPreview(`${senderName} : ${content}`);
+          setNotification({
+            open: true,
+            message: {
+              title: me?.role === "admin" && subject === "User Report" ? 'user report' : 'message',
+              content: contentPreview,
+              icon: 'message'
+            },
+            type: 'info',
+            closing: false
+          });
         }
         // auto close
         window.setTimeout(() => {
           setNotification((s) => ({ ...s, closing: true }));
           window.setTimeout(() => setNotification({ open: false, message: "", type: "info", closing: false }), 300);
         }, 3500);
-      } catch (e) {
-        console.error('notify incoming handler', e);
-      }
+      } catch (e) { }
     };
     window.addEventListener('notify:incoming', handler);
     return () => window.removeEventListener('notify:incoming', handler);
-  }, []);
+  }, [me]);
 
   // Global socket listeners for opportunity create/update/delete
   useEffect(() => {
@@ -292,7 +496,7 @@ export default function Topbar() {
           }
           return arr;
         });
-      } catch (e) { console.error(e); }
+      } catch (e) { }
     };
 
     const onUpdated = (payload) => {
@@ -305,7 +509,7 @@ export default function Topbar() {
           else arr.unshift(opp);
           return arr;
         });
-      } catch (e) { console.error(e); }
+      } catch (e) { }
     };
 
     const onDeleted = (payload) => {
@@ -316,7 +520,7 @@ export default function Topbar() {
           if (!Array.isArray(old)) return old;
           return old.filter((x) => String(x._id || x.id) !== id);
         });
-      } catch (e) { console.error(e); }
+      } catch (e) { }
     };
 
     const attachHandlers = () => {
@@ -346,7 +550,81 @@ export default function Topbar() {
         socket.off('disconnect', onDisconnect);
       } catch (e) { }
     };
-  }, [queryClient]);
+  }, [me, queryClient]);
+
+  // Global socket listeners for pickup events
+  useEffect(() => {
+    if (!socket) return;
+    
+    const updatePickupCache = (pickup) => {
+      try {
+        queryClient.setQueryData(["pickups"], (old) => {
+           if (!old) return [pickup];
+           const index = old.findIndex(p => String(p._id) === String(pickup._id));
+           if (index > -1) {
+              const next = [...old];
+              next[index] = pickup;
+              return next;
+           }
+           return [pickup, ...old];
+        });
+      } catch (e) { }
+    };
+
+    const deletePickupCache = (payload) => {
+      try {
+        const id = payload && (payload.id || payload._id || payload) ? String(payload.id || payload._id || payload) : null;
+        if (!id) return;
+        queryClient.setQueryData(["pickups"], (old) => {
+           if (!old) return [];
+           return old.filter(p => String(p._id) !== String(id));
+        });
+      } catch (e) { }
+    };
+
+    const handlePickupCompleted = (data) => {
+      if (me && String(data.initiatorId) === String(me._id || me.id)) return;
+
+      queryClient.setQueryData(["dashboard"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          co2Saved: (old.co2Saved || 0) + (data.co2Saved || 0),
+          completedCount: (old.completedCount || 0) + 1
+        };
+      });
+
+      updatePickupCache(data);
+    };
+
+    const attachHandlers = () => {
+      try {
+        socket.off('pickup:created', updatePickupCache);
+        socket.off('pickup:updated', updatePickupCache);
+        socket.off('pickup:accepted', updatePickupCache);
+        socket.off('pickup:completed', handlePickupCompleted);
+        socket.off('pickup:deleted', deletePickupCache);
+      } catch (e) { }
+
+      socket.on('pickup:created', updatePickupCache);
+      socket.on('pickup:updated', updatePickupCache);
+      socket.on('pickup:accepted', updatePickupCache);
+      socket.on('pickup:completed', handlePickupCompleted);
+      socket.on('pickup:deleted', deletePickupCache);
+    };
+
+    attachHandlers();
+
+    return () => {
+      try {
+        socket.off('pickup:created', updatePickupCache);
+        socket.off('pickup:updated', updatePickupCache);
+        socket.off('pickup:accepted', updatePickupCache);
+        socket.off('pickup:completed', handlePickupCompleted);
+        socket.off('pickup:deleted', deletePickupCache);
+      } catch (e) {}
+    };
+  }, [me, queryClient]);
 
   // Global socket listeners for chat events so UI updates even when Messages
   // component is not mounted. This ensures volunteers/NGOs see incoming chats
@@ -365,6 +643,12 @@ export default function Topbar() {
           lastMessage: { content: msg.content || (msg.attachments?.[0]?.type === 'image' ? '📷 Photo' : msg.attachments?.[0]?.type === 'audio' ? '🎵 Audio' : '📄 File'), timestamp: msg.timestamp },
           updatedAt: msg.timestamp,
         };
+
+        if (shapedConv?.lastMessage) {
+          shapedConv.lastMessage.content =
+            getStructuredMessageSubject(msg.content || "") ||
+            shapedConv.lastMessage.content;
+        }
 
         queryClient.setQueryData(['conversations'], (old = []) => {
           const exists = old.some((c) => String(c._id) === convId);
@@ -413,9 +697,8 @@ export default function Topbar() {
           }
         } catch (e) { }
 
-        setUnread((u) => u + 1);
         window.dispatchEvent(new CustomEvent('notify:incoming', { detail: msg }));
-      } catch (e) { console.error('onReceiveMessage error', e); }
+      } catch (e) { }
     };
 
     const onConversationCreated = ({ conversation }) => {
@@ -428,12 +711,7 @@ export default function Topbar() {
             : [conversation, ...old];
           return merged.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
         });
-        // bump unread to draw attention (unless user is viewing Messages)
-        if (!window.__IN_MESSAGES) {
-          setUnread((u) => u + 1);
-          window.dispatchEvent(new CustomEvent('notify:incoming', { detail: conversation }));
-        }
-      } catch (e) { console.error('onConversationCreated error', e); }
+      } catch (e) { }
     };
 
     socket.on('receive-message', onReceiveMessage);
@@ -598,7 +876,7 @@ export default function Topbar() {
           <img src={searchIcon} alt="Search" className="search-icon" />
           <input
             className="topbar-search"
-            placeholder="Search pickups, opportunities..."
+            placeholder={isAdmin ? "search opportunity" : "Search pickups, opportunities..."}
             value={searchInput}
             onChange={(e) => {
               const value = e.target.value;
@@ -623,7 +901,7 @@ export default function Topbar() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Toggle Switch */}
-            {me && (
+            {me && !isAdmin && (
               <label className="search-results-switch" aria-label="Toggle Search Filter">
                 <input
                   type="checkbox"
@@ -637,7 +915,7 @@ export default function Topbar() {
 
             {/* Results */}
             <div className="search-results-container">
-              {searchTab === "opportunities" ? (
+              {isAdmin || searchTab === "opportunities" ? (
                 filteredSearchResults.length === 0 ? (
                   <div className="search-no-results">No opportunities found</div>
                 ) : (
@@ -736,17 +1014,17 @@ export default function Topbar() {
 
       <div className="topbar-right" ref={menuRef}>
         <div className="icon-btn" aria-label="notifications" style={{ position: 'relative' }}>
-          <div onClick={() => { setShowNotifications((s) => !s); if (!showNotifications) setUnread(0); }} style={{ cursor: 'pointer' }}>
+          <div onClick={() => { setShowNotifications((s) => !s); }} style={{ cursor: 'pointer' }}>
             <NotificationBell />
             {unread > 0 && (
-              <div style={{ position: 'absolute', right: 0, top: -4, background: '#ff3b30', color: '#fff', borderRadius: '10px', padding: '2px 6px', fontSize: 12 }}>
+              <div style={{ position: 'absolute', right: 0, top: -4, background: 'var(--danger)', color: 'var(--text-inverse)', borderRadius: '10px', padding: '2px 6px', fontSize: 12, boxShadow: 'var(--shadow-soft)' }}>
                 {unread}
               </div>
             )}
           </div>
 
           {showNotifications && (
-            <div style={{ position: 'absolute', right: 0, top: 44, width: 360, maxHeight: 420, overflow: 'auto', background: '#fff', boxShadow: '0 6px 24px rgba(0,0,0,0.12)', borderRadius: 8, zIndex: 60 }}>
+            <div style={{ position: 'absolute', right: 0, top: 44, width: 360, maxHeight: 420, overflow: 'auto', background: 'var(--surface-primary)', boxShadow: 'var(--shadow-strong)', border: '1px solid var(--border-color)', borderRadius: 8, zIndex: 60 }}>
               <NotificationPanel />
             </div>
           )}
@@ -757,6 +1035,20 @@ export default function Topbar() {
           <div className="topbar-menu">
             <div className="menu-content">
               <div className="menu-name">{me?.fullName || "Guest"}</div>
+              <label className="menu-theme-row">
+                <div className="menu-theme-copy">
+                  <span>Dark Mode</span>
+                  <small>{isDarkMode ? "Enabled" : "Disabled"}</small>
+                </div>
+                <input
+                  className="menu-theme-toggle"
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Toggle dark mode"
+                  checked={isDarkMode}
+                  onChange={handleThemeToggle}
+                />
+              </label>
               <button className="menu-item" onClick={() => { setOpen(false); navigate('/home/profile'); }}><img src={profile} alt="Profile" className="menu-icon" /> Profile</button>
               <button className="menu-item" onClick={() => { setOpen(false); navigate('/home/settings'); }}><img src={settings} alt="Settings" className="menu-icon" /> Settings</button>
               <button

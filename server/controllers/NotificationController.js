@@ -38,6 +38,9 @@ const markRead = async (req, res) => {
 
     // delete notification when marked as read (per UI behavior)
     await Notification.deleteOne({ _id: id });
+    if (global.io) {
+      global.io.to(String(userId)).emit("notification:removed", { id: String(id) });
+    }
     return res.json({ message: "Deleted notification" });
   } catch (err) {
     console.error("markRead error:", err);
@@ -59,8 +62,23 @@ const clearChatNotifications = async (req, res) => {
     const ids = msgs.map(m => m._id);
     if (ids.length === 0) return res.json({ deleted: 0 });
 
+    const notifications = await Notification.find({
+      receiverId: userId,
+      type: 'message',
+      referenceId: { $in: ids }
+    }).select('_id').lean();
+    const notificationIds = notifications.map((item) => String(item._id));
+
     const result = await Notification.deleteMany({ receiverId: userId, type: 'message', referenceId: { $in: ids } });
-    return res.json({ deleted: result.deletedCount || 0 });
+
+    if (global.io) {
+      global.io.to(String(userId)).emit("notification:conversation-cleared", {
+        conversationId: String(conversationId),
+        ids: notificationIds,
+      });
+    }
+
+    return res.json({ deleted: result.deletedCount || 0, ids: notificationIds });
   } catch (err) {
     console.error('clearChatNotifications error:', err);
     return res.status(500).json({ message: 'Failed to clear notifications' });

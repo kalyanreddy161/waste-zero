@@ -3,6 +3,10 @@ const Opportunity = require("../models/Opportunities");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const sendNotification = require("../utils/sendNotification");
+const {
+  formatRestrictionMessage,
+  syncModerationState,
+} = require("../utils/accountStatus");
 
 // Volunteer applies to an opportunity
 // POST /applications/apply
@@ -10,7 +14,23 @@ const sendNotification = require("../utils/sendNotification");
 const applyOpportunity = async (req, res) => {
   try {
     const volunteerId = req.session && req.session.user && req.session.user.id;
+    const role = req.session && req.session.user && req.session.user.role;
     if (!volunteerId) return res.status(401).json({ message: "Unauthorized" });
+
+    if (role !== "volunteer") {
+      return res.status(403).json({ message: "Only volunteers can apply to opportunities" });
+    }
+
+    const volunteer = await User.findById(volunteerId);
+    if (!volunteer) return res.status(401).json({ message: "Unauthorized" });
+
+    const { isRestricted, restrictedUntil } = await syncModerationState(volunteer);
+    if (isRestricted) {
+      return res.status(403).json({
+        message: formatRestrictionMessage(restrictedUntil, "applying to opportunities"),
+        restrictedUntil,
+      });
+    }
 
     const { opportunityId } = req.body;
     if (!opportunityId) return res.status(400).json({ message: "opportunityId is required" });
@@ -114,7 +134,7 @@ const getApplicantsByOpportunity = async (req, res) => {
 
     if (String(opportunity.ngo_id) !== String(userId)) return res.status(403).json({ message: "Forbidden" });
 
-    const apps = await Application.find({ opportunityId: id }).sort({ createdAt: -1 }).populate("volunteerId", "fullName");
+    const apps = await Application.find({ opportunityId: id }).sort({ createdAt: -1 }).populate("volunteerId", "fullName email");
     return res.json(apps);
   } catch (err) {
     console.error("getApplicantsByOpportunity error:", err);

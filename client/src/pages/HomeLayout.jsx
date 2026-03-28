@@ -22,6 +22,6 @@ const layoutStyles = {
   },
   main: {
     flex: 1,
-    background: "#f7f7f7",
+    background: "var(--layout-main-bg)",
   },
 };

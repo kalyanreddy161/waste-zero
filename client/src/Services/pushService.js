@@ -19,11 +19,34 @@ function urlBase64ToUint8Array(base64String) {
 async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      // Prefer existing registration if present
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) reg = await navigator.serviceWorker.register('/sw.js');
+
+      // wait until the service worker is active
+      if (reg.installing) {
+        await new Promise((resolve) => {
+          reg.installing.addEventListener('statechange', function listener(e) {
+            if (reg.installing.state === 'activated') {
+              reg.installing.removeEventListener('statechange', listener);
+              resolve();
+            }
+          });
+        });
+      } else if (reg.waiting) {
+        // waiting means installed but not yet active
+        await new Promise((resolve) => {
+          reg.waiting.addEventListener('statechange', function listener(e) {
+            if (reg.waiting.state === 'activated') {
+              reg.waiting.removeEventListener('statechange', listener);
+              resolve();
+            }
+          });
+        });
+      }
+
       return reg;
-    } catch (e) {
-      console.error('SW registration failed', e);
-    }
+    } catch (e) { }
   }
   return null;
 }
@@ -41,18 +64,57 @@ export async function subscribeForPush() {
   try {
     if (!('Notification' in window)) return null;
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return null;
+    if (permission !== 'granted') {
+      return null;
+    }
 
     const reg = await registerServiceWorker();
-    if (!reg || !reg.pushManager) return null;
+    if (!reg) {
+      return null;
+    }
+    if (!reg.pushManager) {
+      return null;
+    }
 
     const publicKey = await getVapidPublicKey();
-    if (!publicKey) return null;
+    if (!publicKey) {
+      return null;
+    }
 
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
+    // Ensure the publicKey is not the private key by basic sanity check
+    if (publicKey.length < 20) {
+      return null;
+    }
+
+    // Reuse existing subscription when present to avoid duplicates
+    let existingSub = null;
+    try {
+      existingSub = await reg.pushManager.getSubscription();
+    } catch (e) { }
+
+    if (existingSub) {
+      // ensure server has the subscription (upsert on server)
+      try {
+        await fetch(`${API_BASE}/api/push/subscribe`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: existingSub.toJSON(), deviceId: localStorage.getItem('push_device_id') || null }),
+        });
+      } catch (e) { }
+      return existingSub;
+    }
+
+    // Create a new subscription
+    let sub = null;
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    } catch (e) {
+      throw e;
+    }
 
     // deviceId stored locally so we can unsubscribe this device on logout
     let deviceId = localStorage.getItem('push_device_id');
@@ -62,16 +124,17 @@ export async function subscribeForPush() {
     }
 
     // send to server
-    await fetch(`${API_BASE}/api/push/subscribe`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscription: sub.toJSON(), deviceId }),
-    });
+    try {
+      await fetch(`${API_BASE}/api/push/subscribe`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), deviceId }),
+      });
+    } catch (e) { }
 
     return sub;
   } catch (e) {
-    console.error('subscribeForPush error', e);
     return null;
   }
 }
@@ -98,9 +161,7 @@ export async function unsubscribePush() {
     }
 
     localStorage.removeItem('push_device_id');
-  } catch (e) {
-    console.error('unsubscribePush error', e);
-  }
+  } catch (e) { }
 }
 
 export function initVisibilityHandlers(socket) {

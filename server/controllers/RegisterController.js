@@ -1,6 +1,12 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const { sendVerificationEmail } = require("../services/EmailService");
+const {
+  formatSuspensionMessage,
+  syncSuspensionState,
+} = require("../utils/accountStatus");
+
+const normalizeEmail = (value) => String(value || "").toLowerCase().trim();
 
 /* ======================
    CHECK USERNAME EXISTS
@@ -37,7 +43,7 @@ exports.existEmail = async (req, res) => {
 exports.sendOTP = async (req, res) => {
   try {
     const { email } = req.body;
-    const userEmail = email.toLowerCase().trim();
+    const userEmail = normalizeEmail(email);
 
     // Find existing user first
     let user = await User.findOne({ email: userEmail });
@@ -58,7 +64,7 @@ exports.sendOTP = async (req, res) => {
         role: "volunteer", // default valid enum
         otp: otp,
         otpExpiresAt: otpExpiry,
-        isProfileCompleted: false,
+        isProfileCompleted: false
       });
     } else {
       // Update existing user OTP and expiry
@@ -82,7 +88,7 @@ exports.verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    const userEmail = email.toLowerCase().trim();
+    const userEmail = normalizeEmail(email);
 
     const user = await User.findOne({ email: userEmail });
 
@@ -125,7 +131,7 @@ exports.register = async (req, res) => {
       bio
     } = req.body;
 
-    const userEmail = email.toLowerCase().trim();
+    const userEmail = normalizeEmail(email);
 
     const user = await User.findOne({ email: userEmail });
 
@@ -164,8 +170,6 @@ exports.register = async (req, res) => {
     user.otp = undefined;
     user.otpExpiresAt = undefined;
 
-    
-
     await user.save();
 
     const userObj = {
@@ -190,6 +194,100 @@ exports.register = async (req, res) => {
   }
 };
 
+exports.sendForgotPasswordOTP = async (req, res) => {
+  try {
+    const userEmail = normalizeEmail(req.body?.email);
+    if (!userEmail) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: userEmail, isProfileCompleted: true });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    const otp = await sendVerificationEmail(userEmail);
+    user.otp = otp;
+    user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error("sendForgotPasswordOTP error:", error);
+    res.status(500).json({ message: error.message || "Failed to send OTP" });
+  }
+};
+
+exports.verifyForgotPasswordOTP = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    const userEmail = normalizeEmail(req.body?.email);
+    if (!userEmail || typeof otp === "undefined") {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    const user = await User.findOne({ email: userEmail, isProfileCompleted: true });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    if (!user.otp || !user.otpExpiresAt) {
+      return res.status(400).json({ message: "OTP not requested" });
+    }
+
+    if (user.otp !== Number(otp)) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    if (user.otpExpiresAt < new Date()) {
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    res.status(200).json({ message: "OTP verified successfully" });
+  } catch (error) {
+    console.error("verifyForgotPasswordOTP error:", error);
+    res.status(500).json({ message: error.message || "Failed to verify OTP" });
+  }
+};
+
+exports.resetForgotPassword = async (req, res) => {
+  try {
+    const { otp, newPassword } = req.body;
+    const userEmail = normalizeEmail(req.body?.email);
+
+    if (!userEmail || typeof otp === "undefined" || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
+
+    const user = await User.findOne({ email: userEmail, isProfileCompleted: true });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    if (!user.otp || !user.otpExpiresAt) {
+      return res.status(400).json({ message: "OTP not requested" });
+    }
+
+    if (user.otp !== Number(otp)) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    if (user.otpExpiresAt < new Date()) {
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.otp = undefined;
+    user.otpExpiresAt = undefined;
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("resetForgotPassword error:", error);
+    res.status(500).json({ message: error.message || "Failed to reset password" });
+  }
+};
+
 
 /* ======================
    LOGIN USER (SESSION)
@@ -206,6 +304,14 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const { isSuspended, suspendedUntil } = await syncSuspensionState(user);
+    if (isSuspended) {
+      return res.status(403).json({
+        message: formatSuspensionMessage(suspendedUntil),
+        suspendedUntil,
+      });
     }
 
     const userObj = {

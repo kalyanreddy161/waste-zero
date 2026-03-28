@@ -8,6 +8,9 @@
 
 /* layout and visual theme */
 .register-container {
+  --auth-primary: #07B17B ;
+  --auth-primary-hover: #05885e;
+  --auth-primary-soft: rgba(7, 177, 123, 0.18);
   display: flex;
   height: 100vh; /* lock viewport height so page doesn't scroll */
   align-items: stretch;
@@ -20,7 +23,7 @@
   width: 50%;
   min-height: 100vh;
   padding: 100px 60px 40px; /* keep ~100px top spacing */
-  background: linear-gradient(135deg, #08C18A 0%, #06A973 100%);
+  background: linear-gradient(135deg, var(--auth-primary) 0%, #048a61 100%);
   color: #ffffff;
   display: flex;
   flex-direction: column;
@@ -59,17 +62,17 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 56px;
-  background: #f7fbf9;
+  background: var(--page-bg);
 }
 
 /* CARD */
 .auth-card {
   width: 460px;
-  background: #ffffff;
+  background: var(--surface-primary);
   border-radius: 14px;
-  border: 1px solid rgba(4, 120, 87, 0.08);
+  border: 1px solid var(--border-color);
   overflow: hidden;
-  box-shadow: 0 18px 40px rgba(6, 110, 82, 0.12);
+  box-shadow: var(--shadow-strong);
   /* constrain card height and allow internal scrolling */
   max-height: calc(100vh - 160px);
   display: flex;
@@ -78,8 +81,31 @@
 
 /* TABS */
 .tab-header { display: flex; background: transparent; padding: 12px 18px; }
-.tab-header button { flex: 1; padding: 12px 10px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: #374151; border-bottom: 3px solid transparent; transition: all 0.18s ease; }
-.tab-header button.active { color: #08C18A; border-bottom-color: #08C18A; }
+.tab-header button {
+  flex: 1;
+  padding: 12px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.18s ease;
+  position: relative;
+}
+.tab-header button::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--auth-primary);
+  transform: scaleX(0);
+  transition: transform 0.18s ease;
+}
+.tab-header button.active { color: var(--auth-primary); }
+.tab-header button.active::after { transform: scaleX(1); }
 
 /* SLIDER */
 .form-wrapper { height: auto; padding: 12px 0 28px; overflow-y: auto; overflow-x: hidden; }
@@ -89,18 +115,20 @@
 
 /* PANEL */
 .form-panel { width: 50%; padding: 28px 32px; }
-.form-panel p { font-size: 14px; color: #6b7280; margin-bottom: 20px; }
+.form-panel h2 { color: var(--text-primary); margin: 0 0 10px; }
+.form-panel p { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
 
 /* ===== FLOATING INPUT ===== */
 .input-container { position: relative; margin-bottom: 18px; }
 
-.input-field { width: 100%; padding: 12px 6px; font-size: 15px; border: none; border-bottom: 2px solid #e6f0ec; outline: none; background: transparent; transition: border-color 0.18s ease; }
+.input-field { width: 100%; padding: 12px 6px; font-size: 15px; border: none; border-bottom: 2px solid var(--border-color); outline: none; background: transparent; color: var(--text-primary); transition: border-color 0.18s ease; }
+.input-field::placeholder { color: var(--text-disabled); }
 
 /* LABEL hidden initially */
-.input-label { position: absolute; left: 6px; top: 10px; font-size: 13px; color: #08C18A; opacity: 0; pointer-events: none; transform: translateY(0); transition: all 0.22s ease; }
+.input-label { position: absolute; left: 6px; top: 10px; font-size: 13px; color: var(--auth-primary); opacity: 0; pointer-events: none; transform: translateY(0); transition: all 0.22s ease; }
 
 /* underline */
-.input-highlight { position: absolute; bottom: 0; left: 0; height: 2px; width: 0; background: #08C18A; transition: 0.26s ease; }
+.input-highlight { position: absolute; bottom: 0; left: 0; height: 2px; width: 0; background: var(--auth-primary); transition: 0.26s ease; }
 
 /* show label on focus OR when input has value */
 .input-field:focus + .input-label, .input-field:not(:placeholder-shown) + .input-label { opacity: 1; transform: translateY(-18px); font-size: 12px; }
@@ -111,7 +139,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #374151;
+  color: var(--text-secondary);
   margin: 6px 0 14px;
   justify-content: flex-start;
 }
@@ -126,9 +154,39 @@
 
 .error-text { color: red; font-size: 0.85rem; margin-top: 4px; }
 
+.auth-link-btn {
+  background: none;
+  border: none;
+  color: var(--auth-primary);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+  margin: -2px 0 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.forgot-auth-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.secondary-auth-btn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
 /* BUTTON */
-.primary-btn { width: 100%; padding: 12px; background: #08C18A; color: #fff; border: none; border-radius: 10px; font-size: 15px; cursor: pointer; margin-top: 10px; box-shadow: 0 8px 18px rgba(8, 193, 138, 0.16); transition: transform 0.12s ease, box-shadow 0.12s ease; }
-.primary-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 22px rgba(8,193,138,0.18); }
+.primary-btn { width: 100%; padding: 12px; background: var(--auth-primary) !important; color: #fff; border: none; border-radius: 10px; font-size: 15px; cursor: pointer; margin-top: 10px; box-shadow: 0 8px 18px var(--auth-primary-soft); transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
+.primary-btn:hover { transform: translateY(-2px); background: var(--auth-primary-hover); box-shadow: 0 12px 22px rgba(7, 177, 123, 0.22); }
+.primary-btn:disabled { opacity: 0.7; box-shadow: none; }
 
 /* make the panel and slider behave nicely */
 
@@ -183,5 +241,17 @@
   .primary-btn { padding: 10px; font-size: 14px; }
 }
 
+html.dark .register-left .register-logo,
+html.dark .register-left .register-heading,
+html.dark .register-left .register-features h4 {
+  color: #ffffff;
+}
 
+html.dark .register-left .register-description,
+html.dark .register-left .register-features p {
+  color: rgba(255, 255, 255, 0.94);
+}
 
+html.dark .tab-header button.active {
+  color: var(--auth-primary);
+}

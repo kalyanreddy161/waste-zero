@@ -65,20 +65,83 @@
   top: 44px;
   width: 250px;
   max-width: 90vw;
-  height: 300px;
+  height: auto;
   max-height: 80vh;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  border-radius: 8px;
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-strong);
+  border-radius: 12px;
   overflow: auto;
   z-index: 50;
+  border: 1px solid var(--border-color);
 }
 .topbar-menu .menu-content { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
-.menu-name { font-weight: 700; font-size: 18px; color: #222; }
-.menu-item { padding: 10px 12px; text-align: left; border: none; background: #f5f5f5; border-radius: 6px; cursor: pointer; }
-.menu-item:hover { background: #eee; }
+.menu-name { font-weight: 700; font-size: 18px; color: var(--text-primary); }
+.menu-item { padding: 10px 12px; text-align: left; border: none; background: var(--surface-secondary); color: var(--text-primary); border-radius: 10px; cursor: pointer; }
+.menu-item:hover { background: var(--surface-hover); }
 .menu-logout { background: #ffecec; color: #b00020; }
 .menu-logout:hover { background: #ffd6d6; }
+
+.menu-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.menu-theme-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.menu-theme-copy span {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.menu-theme-copy small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.menu-theme-toggle {
+  appearance: none;
+  width: 54px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(8, 193, 138, 0.18);
+  background: rgba(8, 193, 138, 0.16);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.24s ease, border-color 0.24s ease;
+  flex-shrink: 0;
+}
+
+.menu-theme-toggle::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+  transition: transform 0.24s ease;
+}
+
+.menu-theme-toggle:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.menu-theme-toggle:checked::before {
+  transform: translateX(24px);
+}
 
 /* Ensure icon + text are aligned in menu items */
 .menu-item { display: flex; align-items: center; gap: 12px; }

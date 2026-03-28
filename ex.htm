@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>2 Color Theme Only</title>
+
+<style>
+:root {
+  /* 🔥 ONLY CHANGE THESE */
+  --primary: #08C18A;
+  --secondary: #1a1d21;
+
+  /* Auto usage */
+  --text-primary: var(--secondary);
+  --text-secondary: var(--primary);
+}
+
+/* Base */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--secondary);
+  color: var(--primary);
+}
+
+/* Layout */
+.container {
+  padding: 20px;
+}
+
+/* Navbar */
+.navbar {
+  background: var(--primary);
+  color: var(--secondary);
+  padding: 14px 20px;
+  font-weight: bold;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 2px solid var(--primary);
+  cursor: pointer;
+  margin: 8px;
+  background: transparent;
+  color: var(--primary);
+  transition: 0.2s;
+}
+
+.btn:hover {
+  transform: scale(1.05);
+}
+
+/* Filled button */
+.btn-fill {
+  background: var(--primary);
+  color: var(--secondary);
+  border: none;
+}
+
+/* Card */
+.card {
+  border: 2px solid var(--primary);
+  padding: 16px;
+  margin-top: 20px;
+  border-radius: 10px;
+}
+
+/* Inverted Card */
+.card-invert {
+  background: var(--primary);
+  color: var(--secondary);
+  padding: 16px;
+  margin-top: 20px;
+  border-radius: 10px;
+}
+
+/* Input */
+input {
+  background: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  padding: 8px;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+input::placeholder {
+  color: var(--primary);
+  opacity: 0.7;
+}
+
+input:focus {
+  outline: none;
+  background: var(--primary);
+  color: var(--secondary);
+}
+
+/* Divider */
+.divider {
+  height: 2px;
+  background: var(--primary);
+  margin: 20px 0;
+}
+
+/* Badge */
+.badge {
+  border: 1px solid var(--primary);
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* Inverted badge */
+.badge-fill {
+  background: var(--primary);
+  color: var(--secondary);
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="navbar">Two Color Theme</div>
+
+<div class="container">
+
+  <h1>Primary + Secondary Only</h1>
+
+  <!-- Buttons -->
+  <button class="btn">Outline Button</button>
+  <button class="btn btn-fill">Filled Button</button>
+
+  <!-- Badges -->
+  <div>
+    <span class="badge">Outline Badge</span>
+    <span class="badge badge-fill">Filled Badge</span>
+  </div>
+
+  <!-- Input -->
+  <input placeholder="Type something..." />
+
+  <div class="divider"></div>
+
+  <!-- Cards -->
+  <div class="card">
+    <h3>Outline Card</h3>
+    <p>Uses only border + text color</p>
+    <button class="btn">Action</button>
+  </div>
+
+  <div class="card-invert">
+    <h3>Filled Card</h3>
+    <p>Fully inverted colors</p>
+    <button class="btn btn-fill">Action</button>
+  </div>
+
+</div>
+
+</body>
+</html>

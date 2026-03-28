@@ -1,6 +1,7 @@
 self.addEventListener('push', (event) => {
   try {
     const data = event.data ? event.data.json() : { title: 'Notification', body: '' };
+    console.log('[sw] push received', data);
     event.waitUntil(
       self.registration.showNotification(data.title, {
         body: data.body,
@@ -18,6 +19,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   try {
     event.notification.close();
+    console.log('[sw] notificationclick', event.action, event.notification && event.notification.data);
     if (event.action === 'open') {
       event.waitUntil(clients.openWindow(event.notification.data && event.notification.data.url ? event.notification.data.url : '/'));
     }

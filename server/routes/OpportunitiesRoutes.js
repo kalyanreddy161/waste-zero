@@ -16,6 +16,9 @@ router.get("/opportunities/:id", checkAuth, OpportunitiesController.getOpportuni
 // Get all opportunities
 router.get("/opportunities",checkAuth, OpportunitiesController.getAllOpportunities);
 
+// Volunteer reports an opportunity owner to admin
+router.post("/opportunities/:id/report", checkAuth, OpportunitiesController.reportOpportunityToAdmin);
+
 // Create a new opportunity
 router.post("/opportunities", checkAuth, OpportunitiesController.createOpportunity);
 

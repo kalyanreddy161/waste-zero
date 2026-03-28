@@ -1,69 +1,88 @@
-import React from 'react';
-import styled from 'styled-components';
+import React from "react";
+import styled from "styled-components";
 
-const Card = () => {
+const PageNotFound = () => {
   return (
-    <>
-    <h2 className="logo">
-        <lord-icon
-          src="https://cdn.lordicon.com/zruuduya.json"
-          trigger="hover"
-          colors="primary:#121331,secondary:#08C18A"
-          style={{ width: "34px", height: "34px" }}
-        ></lord-icon>
-        <span className="logo-title">WasteZero</span>
-      </h2>
     <StyledWrapper>
-    <div className='page-not-found-container'>
-      <div className="card">
-        <div className="orb orb--1" />
-        <div className="orb orb--2" />
-        <div className="orb orb--3" />
-        <div className="orb orb--4" />
-        <div className="error-container">
-          <div className="error-code">404</div>
-          <div className="error-msg">Nothing to see here.</div>
-          <a href="/" className="home-btn">Go Home</a>
+      <div className="page-not-found-container">
+        <div className="page-not-found-brand">
+          <lord-icon
+            src="https://cdn.lordicon.com/zruuduya.json"
+            trigger="hover"
+            colors="primary:#121331,secondary:#08C18A"
+            style={{ width: "56px", height: "56px" }}
+          ></lord-icon>
+          <span className="page-not-found-brand-text">WasteZero</span>
         </div>
-        <div className="duck__wrapper">
-          <div className="duck">
-            <div className="duck__inner">
-              <div className="duck__mouth" />
-              <div className="duck__head">
-                <div className="duck__eye" />
-                <div className="duck__white" />
+
+        <div className="card">
+          <div className="orb orb--1" />
+          <div className="orb orb--2" />
+          <div className="orb orb--3" />
+          <div className="orb orb--4" />
+
+          <div className="error-container">
+            <div className="error-code">404</div>
+            <div className="error-msg">Nothing to see here.</div>
+            <a href="/" className="home-btn">
+              Go Home
+            </a>
+          </div>
+
+          <div className="duck__wrapper">
+            <div className="duck">
+              <div className="duck__inner">
+                <div className="duck__mouth" />
+                <div className="duck__head">
+                  <div className="duck__eye" />
+                  <div className="duck__white" />
+                </div>
+                <div className="duck__body" />
+                <div className="duck__wing" />
               </div>
-              <div className="duck__body" />
-              <div className="duck__wing" />
+              <div className="duck__foot duck__foot--1" />
+              <div className="duck__foot duck__foot--2" />
+              <div className="surface" />
             </div>
-            <div className="duck__foot duck__foot--1" />
-            <div className="duck__foot duck__foot--2" />
-            <div className="surface" />
           </div>
         </div>
       </div>
-    </div>
     </StyledWrapper>
-    </>
   );
-}
+};
 
 const StyledWrapper = styled.div`
-.page-not-found-container {
+  .page-not-found-container {
     display: flex;
-    felx-direction: column;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 80vh;
-}
+    gap: 24px;
+    padding: 32px 20px;
+  }
+
+  .page-not-found-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .page-not-found-brand-text {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #121331;
+    letter-spacing: -1px;
+  }
+
   .card {
-    --bg-gradient: #08C18A;
+    --bg-gradient: #08c18a;
     --duck-body: #f4f4f5;
     --duck-wing: #e4e4e7;
     --duck-beak: #ff3b30;
     --duck-feet: #ff9f0a;
     --duck-eye: #18181b;
-
     --base-speed: 1s;
     --turbo-speed: 0.3s;
 
@@ -87,9 +106,6 @@ const StyledWrapper = styled.div`
 
   .card:hover {
     transform: translateY(-5px);
-  }
-
-  .card:hover {
     --base-speed: var(--turbo-speed);
   }
 
@@ -137,7 +153,7 @@ const StyledWrapper = styled.div`
 
   .card .home-btn:hover {
     background-color: var(--duck-beak);
-    color: white;
+    color: #fff;
     transform: scale(1.05);
   }
 
@@ -146,7 +162,6 @@ const StyledWrapper = styled.div`
     place-content: center;
     z-index: 5;
     transform: scale(0.85);
-
     transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
@@ -164,7 +179,6 @@ const StyledWrapper = styled.div`
     display: flex;
     flex-direction: column;
     position: relative;
-
     animation: bird-up-down calc(var(--base-speed) / 2) linear infinite;
   }
 
@@ -188,10 +202,12 @@ const StyledWrapper = styled.div`
     height: 2rem;
     top: 0;
   }
+
   .card .duck__head::after {
     left: 44%;
     transform: translate(-50%, -50%) rotate(-30deg);
   }
+
   .card .duck__head::before {
     left: 45%;
     transform: translate(-50%, -50%) rotate(10deg);
@@ -279,7 +295,7 @@ const StyledWrapper = styled.div`
     position: absolute;
     width: 2rem;
     height: 0.6rem;
-    bottom: 0rem;
+    bottom: 0;
     left: -0.5rem;
     background-color: var(--duck-feet);
     border-radius: 1rem;
@@ -295,9 +311,9 @@ const StyledWrapper = styled.div`
   .card .duck__foot--1 {
     animation: foot-ans var(--base-speed) linear infinite;
   }
+
   .card .duck__foot--2 {
-    animation: foot-ans var(--base-speed) calc(var(--base-speed) / 2) linear
-      infinite;
+    animation: foot-ans var(--base-speed) calc(var(--base-speed) / 2) linear infinite;
   }
 
   .card .surface {
@@ -335,23 +351,36 @@ const StyledWrapper = styled.div`
     height: 40px;
     animation-delay: 0s;
   }
+
   .card .orb--2 {
     top: 30%;
     width: 20px;
     height: 20px;
     animation-delay: -2s;
   }
+
   .card .orb--3 {
     top: 60%;
     width: 60px;
     height: 60px;
     animation-delay: -4s;
   }
+
   .card .orb--4 {
     top: 80%;
     width: 30px;
     height: 30px;
     animation-delay: -6s;
+  }
+
+  @media (max-width: 640px) {
+    .page-not-found-brand {
+      gap: 10px;
+    }
+
+    .page-not-found-brand-text {
+      font-size: 2.1rem;
+    }
   }
 
   @keyframes surface-animation {
@@ -391,7 +420,7 @@ const StyledWrapper = styled.div`
       transform: translateY(0.4rem);
     }
     50% {
-      transform: translateY(0rem);
+      transform: translateY(0);
     }
   }
 
@@ -430,6 +459,7 @@ const StyledWrapper = styled.div`
       transform: translateX(-200px);
       opacity: 0;
     }
-  }`;
+  }
+`;
 
-export default Card;
+export default PageNotFound;

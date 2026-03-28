@@ -102,6 +102,17 @@ export default function Register() {
   });
 
   const [loginError, setLoginError] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotData, setForgotData] = useState({
+    email: "",
+    otp: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+  const [forgotOtpVerified, setForgotOtpVerified] = useState(false);
+  const [forgotPasswordsMatch, setForgotPasswordsMatch] = useState(true);
+  const [forgotError, setForgotError] = useState("");
 
   /* ======================
      INPUT HANDLERS
@@ -113,6 +124,35 @@ export default function Register() {
 
   const handleLoginChange = (e) => {
     setLoginData({ ...loginData, [e.target.name]: e.target.value });
+  };
+
+  const resetForgotPasswordState = () => {
+    setForgotData({
+      email: "",
+      otp: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setForgotOtpSent(false);
+    setForgotOtpVerified(false);
+    setForgotPasswordsMatch(true);
+    setForgotError("");
+  };
+
+  const handleForgotChange = (e) => {
+    const { name, value } = e.target;
+    setForgotData((current) => {
+      const next = { ...current, [name]: value };
+      if (name === "email") {
+        setForgotOtpSent(false);
+        setForgotOtpVerified(false);
+        next.otp = "";
+        next.newPassword = "";
+        next.confirmPassword = "";
+      }
+      return next;
+    });
+    setForgotError("");
   };
 
   /* ======================
@@ -163,6 +203,15 @@ export default function Register() {
     setPasswordsMatch(password === confirmPassword);
   }, [registerData.password, registerData.confirmPassword]);
 
+  useEffect(() => {
+    if (!forgotData.confirmPassword) {
+      setForgotPasswordsMatch(true);
+      return;
+    }
+
+    setForgotPasswordsMatch(forgotData.newPassword === forgotData.confirmPassword);
+  }, [forgotData.newPassword, forgotData.confirmPassword]);
+
   /* ======================
      REGISTER SUBMIT
   ====================== */
@@ -171,7 +220,6 @@ export default function Register() {
     if (isLoading) return;
     setLoginError("");
     setRegisterWarning("");
-    console.log("handleRegister called", { registerData, otpVerified, emailExists, usernameExists });
 
     // validate required fields (exclude the show-password checkbox)
     const { fullName, email, username, password, confirmPassword, role } = registerData;
@@ -223,10 +271,8 @@ export default function Register() {
 
       // handle error response
       const err = await res.json();
-      console.error("Register failed:", err);
       setRegisterWarning(err.message || "Registration failed");
     } catch (networkErr) {
-      console.error("Register network error:", networkErr);
       setRegisterWarning(networkErr.message || "Registration failed");
     } finally {
       setLoading(false);
@@ -311,6 +357,111 @@ export default function Register() {
         setOtpError(err.message || "OTP verification failed");
         setOtpVerified(false);
       }
+    }
+  };
+
+  const handleForgotOtpButtonClick = async () => {
+    setForgotError("");
+
+    if (!forgotData.email) {
+      setForgotError("Please enter your email first.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (!forgotOtpSent) {
+        const res = await fetch(`${API}/forgot-password/send-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: forgotData.email }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setForgotError(data.message || "Failed to send OTP");
+          return;
+        }
+
+        setForgotOtpSent(true);
+        showMessage("Password reset OTP sent to your email", "success");
+        return;
+      }
+
+      if (!forgotOtpVerified) {
+        if (!forgotData.otp) {
+          setForgotError("Please enter the OTP you received.");
+          return;
+        }
+
+        const res = await fetch(`${API}/forgot-password/verify-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: forgotData.email, otp: forgotData.otp }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setForgotError(data.message || "OTP verification failed");
+          return;
+        }
+
+        setForgotOtpVerified(true);
+        showMessage("OTP verified", "success");
+      }
+    } catch (err) {
+      setForgotError(err.message || "Failed to continue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setForgotError("");
+
+    if (!forgotOtpVerified) {
+      setForgotError("Verify your OTP before creating a new password.");
+      return;
+    }
+
+    if (!forgotData.newPassword || !forgotData.confirmPassword) {
+      setForgotError("Please enter and confirm your new password.");
+      return;
+    }
+
+    if (forgotData.newPassword !== forgotData.confirmPassword) {
+      setForgotError("Passwords do not match.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(`${API}/forgot-password/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: forgotData.email,
+          otp: forgotData.otp,
+          newPassword: forgotData.newPassword,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setForgotError(data.message || "Failed to reset password");
+        return;
+      }
+
+      showMessage("Password reset successful. Login with your username and new password.", "success");
+      resetForgotPasswordState();
+      setShowForgotPassword(false);
+      setMode("login");
+    } catch (err) {
+      setForgotError(err.message || "Failed to reset password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -400,13 +551,13 @@ export default function Register() {
             <div className="tab-header">
               <button
                 className={mode === "login" ? "active" : ""}
-                onClick={() => setMode("login")}
+                onClick={() => { setMode("login"); setShowForgotPassword(false); }}
               >
                 Login
               </button>
               <button
                 className={mode === "register" ? "active" : ""}
-                onClick={() => setMode("register")}
+                onClick={() => { setMode("register"); setShowForgotPassword(false); resetForgotPasswordState(); }}
               >
                 Register
               </button>
@@ -417,41 +568,172 @@ export default function Register() {
               <div className={`form-slider ${mode}`}>
 
                 {/* LOGIN */}
-                <form className="form-panel" onSubmit={handleLogin}>
-                  <h2>Welcome Back</h2>
-                  <p>Login to continue WasteZero</p>
+                <form className="form-panel" onSubmit={showForgotPassword ? handleResetPassword : handleLogin}>
+                  <h2>{showForgotPassword ? "Reset Password" : "Welcome Back"}</h2>
+                  <p>{showForgotPassword ? "Verify OTP and create a new password for your account" : "Login to continue WasteZero"}</p>
 
-                  <div className="input-container">
-                    <input
-                      type="text"
-                      name="username"
-                      placeholder="Enter username"
-                      className="input-field"
-                      onChange={handleLoginChange}
-                    />
-                    <label className="input-label">Username</label>
-                    <span className="input-highlight"></span>
-                  </div>
+                  {!showForgotPassword ? (
+                    <>
+                      <div className="input-container">
+                        <input
+                          type="text"
+                          name="username"
+                          placeholder="Enter username"
+                          className="input-field"
+                          onChange={handleLoginChange}
+                        />
+                        <label className="input-label">Username</label>
+                        <span className="input-highlight"></span>
+                      </div>
 
-                  <div className="input-container">
-                    <input
-                      type="password"
-                      name="password"
-                      placeholder="Enter password"
-                      className="input-field"
-                      onChange={handleLoginChange}
-                    />
-                    <label className="input-label">Password</label>
-                    <span className="input-highlight"></span>
-                  </div>
+                      <div className="input-container">
+                        <input
+                          type="password"
+                          name="password"
+                          placeholder="Enter password"
+                          className="input-field"
+                          onChange={handleLoginChange}
+                        />
+                        <label className="input-label">Password</label>
+                        <span className="input-highlight"></span>
+                      </div>
 
-                  {loginError && (
-                    <p style={{ color: "red", fontSize: "0.85rem" }}>
-                      {loginError}
-                    </p>
+                      <button
+                        type="button"
+                        className="auth-link-btn"
+                        onClick={() => {
+                          setShowForgotPassword(true);
+                          setLoginError("");
+                          resetForgotPasswordState();
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+
+                      {loginError && (
+                        <p style={{ color: "var(--danger)", fontSize: "0.85rem" }}>
+                          {loginError}
+                        </p>
+                      )}
+
+                      <button className="primary-btn">Login</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="input-container">
+                        <input
+                          type="email"
+                          name="email"
+                          placeholder="Enter your email"
+                          className="input-field"
+                          value={forgotData.email}
+                          onChange={handleForgotChange}
+                        />
+                        <label className="input-label">Email</label>
+                        <span className="input-highlight"></span>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                        <div className="input-container" style={{ flex: 7, minWidth: 0 }}>
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            name="otp"
+                            placeholder="Enter OTP"
+                            className="input-field"
+                            value={forgotData.otp}
+                            onChange={(e) => handleForgotChange({ target: { name: "otp", value: e.target.value.replace(/[^0-9]/g, "") } })}
+                            autoComplete="one-time-code"
+                          />
+                          <label className="input-label">OTP</label>
+                          <span className="input-highlight"></span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          onClick={handleForgotOtpButtonClick}
+                          style={{ flex: 3, padding: "10px 12px", fontSize: "0.95rem" }}
+                          disabled={isLoading || forgotOtpVerified}
+                        >
+                          {!forgotOtpSent ? "Get OTP" : forgotOtpVerified ? "Verified" : "Verify OTP"}
+                        </button>
+                      </div>
+
+                      {forgotOtpVerified && (
+                        <>
+                          <div className="row">
+                            <div className="input-container">
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                name="newPassword"
+                                placeholder="New password"
+                                className="input-field"
+                                value={forgotData.newPassword}
+                                onChange={handleForgotChange}
+                              />
+                              <label className="input-label">New Password</label>
+                              <span className="input-highlight"></span>
+                            </div>
+
+                            <div className="input-container">
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                name="confirmPassword"
+                                placeholder="Confirm new password"
+                                className="input-field"
+                                value={forgotData.confirmPassword}
+                                onChange={handleForgotChange}
+                              />
+                              <label className="input-label">Confirm Password</label>
+                              <span className="input-highlight"></span>
+                            </div>
+                          </div>
+
+                          {!forgotPasswordsMatch && forgotData.confirmPassword && (
+                            <p style={{ color: "var(--danger)", fontSize: "0.85rem", marginTop: 6 }}>
+                              Passwords do not match
+                            </p>
+                          )}
+
+                          <div className="show-password">
+                            <input
+                              type="checkbox"
+                              id="showForgotPwd"
+                              onChange={() => setShowPassword(!showPassword)}
+                            />
+                            <label htmlFor="showForgotPwd">Show Password</label>
+                          </div>
+                        </>
+                      )}
+
+                      {forgotError && (
+                        <p style={{ color: "var(--danger)", fontSize: "0.85rem" }}>
+                          {forgotError}
+                        </p>
+                      )}
+
+                      <div className="forgot-auth-actions">
+                        <button
+                          type="button"
+                          className="secondary-auth-btn"
+                          onClick={() => {
+                            setShowForgotPassword(false);
+                            resetForgotPasswordState();
+                          }}
+                        >
+                          Back to Login
+                        </button>
+                        <button
+                          className="primary-btn"
+                          type="submit"
+                          disabled={!forgotOtpVerified || !forgotData.newPassword || !forgotData.confirmPassword || !forgotPasswordsMatch || isLoading}
+                        >
+                          Update Password
+                        </button>
+                      </div>
+                    </>
                   )}
-
-                  <button className="primary-btn">Login</button>
                 </form>
 
                 {/* REGISTER */}
@@ -485,7 +767,7 @@ export default function Register() {
                     <span className="input-highlight"></span>
                   </div>
                   {emailExists && (
-                    <p style={{ color: "red", fontSize: "0.85rem" }}>
+                    <p style={{ color: "var(--danger)", fontSize: "0.85rem" }}>
                       Email already exists
                     </p>
                   )}
@@ -536,7 +818,7 @@ export default function Register() {
                   </div>
 
                   {!passwordsMatch && registerData.confirmPassword && (
-                    <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
+                    <p style={{ color: "var(--danger)", fontSize: "0.85rem", marginTop: 6 }}>
                       Passwords do not match
                     </p>
                   )}
@@ -604,19 +886,19 @@ export default function Register() {
                   </div>
 
                   {(otpError || emailExists) && (
-                    <p style={{ color: "red", fontSize: "0.85rem", marginTop: 6 }}>
+                    <p style={{ color: "var(--danger)", fontSize: "0.85rem", marginTop: 6 }}>
                       {otpError || (emailExists ? "Email already exists" : "")}
                     </p>
                   )}
 
                   {otpVerified && (
-                    <p style={{ color: "green", fontSize: "0.85rem", marginTop: 6 }}>
+                    <p style={{ color: "var(--success)", fontSize: "0.85rem", marginTop: 6 }}>
                       OTP verified ✓
                     </p>
                   )}
 
                   {registerWarning && (
-                    <p style={{ color: "red", fontSize: "0.95rem", marginTop: 8 }}>
+                    <p style={{ color: "var(--danger)", fontSize: "0.95rem", marginTop: 8 }}>
                       {registerWarning}
                     </p>
                   )}

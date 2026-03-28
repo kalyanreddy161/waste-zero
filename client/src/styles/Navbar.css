@@ -2,8 +2,8 @@
 .sidebar {
   width: 260px;
   height: 100vh;
-  background: #fff;
-  border-right: 1px solid #eee;
+  background: var(--surface-primary);
+  border-right: 1px solid var(--border-color);
   padding: 18px;
   box-sizing: border-box;
   position: relative;
@@ -24,19 +24,19 @@
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: var(--border-color);
   border-radius: 10px;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: var(--border-strong);
 }
 
 /* Logo Container */
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   /* Space between icon and text */
   margin: 10px 0 25px;
   /* Adjusted margins */
@@ -45,18 +45,18 @@
 
 /* IMPORTANT: This makes the animated logo visible */
 .logo lord-icon {
-  width: 45px;
+  width: 50px;
   /* Set explicit width */
-  height: 45px;
+  height: 50px;
   /* Set explicit height */
 }
 
 /* Fixed Logo Title Size */
 .logo-title {
   font-weight: 800;
-  font-size: 22px;
+  font-size: 24px;
   /* Reduced from 40px to fit sidebar width */
-  color: #121331;
+  color: var(--text-primary);
   /* Matches your lord-icon primary color */
   letter-spacing: -0.5px;
   line-height: 1;
@@ -66,13 +66,13 @@
 .user-box {
   padding: 10px 8px;
   margin-bottom: 18px;
-  border-top: 1px solid #e6e6e6;
-  border-bottom: 1px solid #e6e6e6;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .user-role {
   font-size: 11px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 4px;
   text-transform: uppercase;
 }
@@ -80,12 +80,26 @@
 .user-name {
   font-size: 16px;
   font-weight: 700;
-  color: #222;
+  color: var(--text-primary);
+}
+
+.user-restricted-badge {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #c62828;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(198, 40, 40, 0.08);
+  border: 1px solid rgba(198, 40, 40, 0.2);
+  border-radius: 999px;
+  padding: 5px 10px;
 }
 
 .section {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
   margin: 8px 0;
 }
 
@@ -100,11 +114,11 @@
   width: 100%;
   padding: 12px 14px;
   border: none;
-  background: #fff;
-  color: #000;
+  background: transparent;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 15px;
-  border-radius: 6px;
+  border-radius: 10px;
   margin-bottom: 8px;
   position: relative;
   z-index: 2;
@@ -117,6 +131,10 @@
 
 .nav-link.active {
   color: #fff;
+}
+
+.nav-link:not(.active):hover {
+  background: var(--surface-hover);
 }
 
 /* sliding background indicator */
@@ -160,4 +178,17 @@
 
 .link-plain.logout {
   margin-top: 8px;
+}
+
+.nav-link.logout {
+  color: var(--danger);
+}
+
+.nav-link.logout:hover {
+  background: var(--surface-danger-soft);
+  color: var(--danger);
+}
+
+.nav-link.logout .nav-icon {
+  filter: invert(17%) sepia(94%) saturate(3184%) hue-rotate(345deg) brightness(90%) contrast(101%);
 }

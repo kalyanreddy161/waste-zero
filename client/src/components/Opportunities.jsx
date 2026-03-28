@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/NavbarComponents-styles/Opportunities.css";
 import { useMe, API_BASE } from "../Services/useMe";
@@ -8,7 +8,8 @@ import ConfirmDialog from "./ConfirmDialog";
 import MessageBox from "./MessageBox";
 import Loading from "./Loading";
 import MapPicker from "./MapPicker";
-import socket from "../Services/socket";
+import ActionButton from "./ActionButton";
+import socket from "../services/socket";
 import { VolunteerApplicationModal, ApplicationModal } from "./NotificationPanel";
 
 const formatRelativeTime = (iso) => {
@@ -46,21 +47,79 @@ const UsersIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
 );
 
-const EditIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-);
-
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-);
-
 const SearchIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
 );
 
-const FilterIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+const MoreVerticalIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <circle cx="12" cy="5" r="1.8"></circle>
+    <circle cx="12" cy="12" r="1.8"></circle>
+    <circle cx="12" cy="19" r="1.8"></circle>
+  </svg>
 );
+
+const OPPORTUNITY_REPORT_REASONS = [
+  "Spreading false information",
+  "These types of opportunities are not allowed",
+  "Misleading event details or location",
+  "Repeated policy violations",
+  "Suspicious or unsafe activity reported",
+];
+
+const OPPORTUNITY_MODERATION_REASON_PRESETS = [
+  "Misleading event details or location",
+  "These types of opportunities are not allowed",
+  "Repeated policy violations",
+  "Suspicious or unsafe activity reported",
+  "Unsafe or harmful behaviour reported",
+];
+
+const OPPORTUNITY_MODERATION_DURATION_OPTIONS = [
+  { value: "1", label: "1 day" },
+  { value: "3", label: "3 days" },
+  { value: "7", label: "7 days" },
+  { value: "15", label: "15 days" },
+  { value: "custom", label: "Custom input" },
+];
+
+const DEFAULT_OPPORTUNITY_MODERATION_STATE = {
+  open: false,
+  mode: "",
+  duration: "1",
+  customDays: "",
+  deleteOpportunity: false,
+  reason: "",
+  reasonError: false,
+};
+
+const formatRestrictionUntil = (value) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const buildRestrictionDialogMessage = (restrictedUntil, blockedAction) => {
+  const formatted = formatRestrictionUntil(restrictedUntil);
+  const actionText = blockedAction ? ` from ${blockedAction}` : "";
+
+  if (!formatted) {
+    return `You are currently restricted${actionText} by WasteZero admin.`;
+  }
+
+  return `You are currently restricted${actionText} until ${formatted}.`;
+};
 
 const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilter, initialStatusFilter } = {}) => {
   const [opportunities, setOpportunities] = useState([]);
@@ -98,17 +157,29 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   const [participantsCountMap, setParticipantsCountMap] = useState({});
   const [notification, setNotification] = useState({ open: false, message: "", type: "info", closing: false });
   const [showAppView, setShowAppView] = useState(false);
+  // Apply confirm dialog
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
 
   // NGO: View Applications for the selected opportunity
   const [showApplicantsView, setShowApplicantsView] = useState(false);
   const [opportunityApplicants, setOpportunityApplicants] = useState([]);
   const [applicantsLoading, setApplicantsLoading] = useState(false);
   const [selectedApplicantNotif, setSelectedApplicantNotif] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [closingReportModal, setClosingReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportReasonError, setReportReasonError] = useState(false);
+  const [moderatingOpportunity, setModeratingOpportunity] = useState(false);
+  const [showOpportunityActionMenu, setShowOpportunityActionMenu] = useState(false);
+  const [reportSuccessDialogOpen, setReportSuccessDialogOpen] = useState(false);
+  const [opportunityModerationState, setOpportunityModerationState] = useState(
+    DEFAULT_OPPORTUNITY_MODERATION_STATE
+  );
+  const [restrictionDialog, setRestrictionDialog] = useState({ open: false, message: "" });
 
   const { data: me } = useMe();
   const queryClient = useQueryClient();
   const { data: applications = [], refetch: refetchApplications } = useApplications();
-  console.log("Opportunities - me object:", me);
   const navigate = useNavigate();
   const loc = useLocation();
   const [topbarPresent, setTopbarPresent] = useState(true);
@@ -116,6 +187,17 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   const [scopeFilter, setScopeFilter] = useState(initialScopeFilter || 'all'); // 'all' | 'mine'
   const [compositeOpen, setCompositeOpen] = useState(false);
   const compositeRef = useRef(null);
+  const opportunityActionMenuRef = useRef(null);
+  const myId = me?.id || me?._id;
+  const isAdmin = me?.role === "admin";
+  const isNgo = me?.role === "ngo";
+  const isVolunteer = me?.role === "volunteer";
+  const minOpportunityDate = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString()
+      .split("T")[0];
+  }, []);
 
   // Helper to normalize an opportunity: extract `(Date: YYYY-MM-DD)` suffix
   // from description into a `date` field and trim the description.
@@ -155,6 +237,30 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     }, duration);
   };
 
+  const openRestrictionDialog = (message) => {
+    setRestrictionDialog({
+      open: true,
+      message,
+    });
+  };
+
+  const closeRestrictionDialog = () => {
+    setRestrictionDialog({ open: false, message: "" });
+  };
+
+  const getActiveRestrictionUntil = () => {
+    if (!me?.restrictedUntil) {
+      return null;
+    }
+
+    const restrictedUntil = new Date(me.restrictedUntil);
+    if (Number.isNaN(restrictedUntil.getTime()) || restrictedUntil <= new Date()) {
+      return null;
+    }
+
+    return me.restrictedUntil;
+  };
+
   // Use react-query to fetch opportunities and keep a long-lived cache.
   const {
     data: fetchedOpportunities,
@@ -181,15 +287,28 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     }
   }, [fetchedOpportunities, refetchApplications]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (scopeFilter !== "all") {
+      setScopeFilter("all");
+    }
+    if (!initialStatusFilter && statusFilter === "all") {
+      setStatusFilter("open");
+    }
+  }, [initialStatusFilter, isAdmin, scopeFilter, statusFilter]);
+
   // Helper: haversine distance in meters
   const haversine = (lat1, lon1, lat2, lon2) => {
     const toRad = (deg) => (deg * Math.PI) / 180;
     const R = 6371e3; // metres
-    const φ1 = toRad(lat1);
-    const φ2 = toRad(lat2);
-    const Δφ = toRad(lat2 - lat1);
-    const Δλ = toRad(lon2 - lon1);
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const phi1 = toRad(lat1);
+    const phi2 = toRad(lat2);
+    const deltaPhi = toRad(lat2 - lat1);
+    const deltaLambda = toRad(lon2 - lon1);
+    const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) *
+      Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -244,8 +363,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   const filtered = useMemo(() => {
     // base set depending on scope
     let base = Array.isArray(opportunities) ? opportunities.map(normalizeOpportunity) : [];
-    if (scopeFilter === 'mine') {
-      const myId = me?.id || me?._id;
+    if (!isAdmin && scopeFilter === 'mine') {
       if (myId) {
         if (me.role === 'ngo') {
           base = base.filter((o) => {
@@ -281,7 +399,44 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
 
       return matchSearch && matchStatus;
     });
-  }, [opportunities, search, statusFilter, scopeFilter, me]);
+  }, [applications, isAdmin, me, myId, opportunities, search, statusFilter, scopeFilter]);
+
+  useEffect(() => {
+    const visibleIds = Array.isArray(filtered)
+      ? filtered.map((opp) => opp?._id || opp?.id).filter(Boolean)
+      : [];
+    const missingIds = visibleIds.filter((id) => participantsCountMap[id] === undefined);
+
+    if (missingIds.length === 0) return;
+
+    let cancelled = false;
+
+    Promise.all(
+      missingIds.map(async (id) => {
+        try {
+          const res = await fetch(`${API_BASE}/opportunities/${id}/participants-count`, { credentials: "include" });
+          if (!res.ok) return [id, 0];
+          const data = await res.json();
+          return [id, data.count || 0];
+        } catch (err) {
+          return [id, 0];
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return;
+      setParticipantsCountMap((current) => {
+        const next = { ...(current || {}) };
+        entries.forEach(([id, count]) => {
+          next[id] = count;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filtered, participantsCountMap]);
 
   const userApp = useMemo(() => {
     if (!selected || !applications) return null;
@@ -303,20 +458,24 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     });
   }, [selected, me, applications]);
 
-  // Debug: log filter state and result count when filters change
-  useEffect(() => {
-    try {
-      console.log('Opportunities filters:', { scopeFilter, statusFilter, search, me });
-      console.log('Filtered count:', filtered.length);
-    } catch (e) { }
-  }, [scopeFilter, statusFilter, search, filtered, me]);
-
   // Ensure composite menu closes when filters change (covers any event propagation issues)
   useEffect(() => {
     if (compositeOpen) setCompositeOpen(false);
   }, [scopeFilter, statusFilter]);
 
   const handleOpenCreate = () => {
+    const restrictedUntil = getActiveRestrictionUntil();
+    if (restrictedUntil) {
+      openRestrictionDialog(
+        buildRestrictionDialogMessage(restrictedUntil, "creating opportunities")
+      );
+      return;
+    }
+
+    if (!isNgo) {
+      showMessage("Only NGO accounts can create opportunities.", "error");
+      return;
+    }
     setTitle("");
     setDescription("");
     setRequiredSkills("");
@@ -376,13 +535,13 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           if (!Array.isArray(old)) return old;
           return old.filter((x) => String(x._id || x.id) !== String(confirmId));
         });
-      } catch (e) { console.error('failed to update query cache after delete', e); }
+      } catch (e) { }
       if (selected && selected._id === confirmId) setSelected(null);
       setConfirmOpen(false);
       setConfirmId(null);
       showMessage("Opportunity deleted", "success");
     } catch (err) {
-      const msg = err.message || "Error deleting opportunity";
+      const msg = err.message || "Failed to delete opportunity";
       setError(msg);
       showMessage(msg, "error");
     } finally {
@@ -392,6 +551,10 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!isNgo) {
+      setError("Only NGO accounts can create opportunities.");
+      return;
+    }
     const ngoId = me?.id || me?._id;
     if (!ngoId) {
       setError("NGO id is not set. Please log in as NGO.");
@@ -432,6 +595,16 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 403 && data?.restrictedUntil) {
+          openRestrictionDialog(
+            data.message ||
+              buildRestrictionDialogMessage(
+                data.restrictedUntil,
+                "creating opportunities"
+              )
+          );
+          return;
+        }
         throw new Error(data.message || "Failed to create opportunity");
       }
       let created = data.opportunity || data;
@@ -452,7 +625,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           if (exists !== -1) arr[exists] = created; else arr.unshift(created);
           return arr;
         });
-      } catch (e) { console.error('failed to update query cache after create', e); }
+      } catch (e) { }
       setShowCreate(false);
       showMessage("Opportunity created", "success");
       // If this component was rendered inside the Dashboard (or navigated
@@ -464,7 +637,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
         } catch (e) { }
       }
     } catch (err) {
-      const msg = err.message || "Error creating opportunity";
+      const msg = err.message || "Failed to create opportunity";
       setError(msg);
       showMessage(msg, "error");
     } finally {
@@ -517,7 +690,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           if (!Array.isArray(old)) return old;
           return old.map((x) => (String(x._id || x.id) === String(norm._id || norm.id) ? norm : x));
         });
-      } catch (e) { console.error('failed to update query cache after update', e); }
+      } catch (e) { }
       // if this opportunity is currently open in details, update selected
       if (selected && (selected._id === norm._id)) {
         setSelected(norm);
@@ -527,7 +700,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
       setEditingId(null);
       showMessage("Opportunity updated", "success");
     } catch (err) {
-      const msg = err.message || "Error updating opportunity";
+      const msg = err.message || "Failed to update opportunity";
       setError(msg);
       showMessage(msg, "error");
     } finally {
@@ -537,6 +710,17 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
 
   const handleApply = async () => {
     if (!selected || !me) return;
+    const restrictedUntil = getActiveRestrictionUntil();
+    if (restrictedUntil) {
+      openRestrictionDialog(
+        buildRestrictionDialogMessage(restrictedUntil, "applying to opportunities")
+      );
+      return;
+    }
+    if (!isVolunteer) {
+      showMessage("Only volunteers can apply to opportunities.", "error");
+      return;
+    }
     const oppId = selected._id || selected.id;
     if (!oppId) return;
 
@@ -551,7 +735,19 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
         body: JSON.stringify({ opportunityId: oppId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to apply");
+      if (!res.ok) {
+        if (res.status === 403 && data?.restrictedUntil) {
+          openRestrictionDialog(
+            data.message ||
+              buildRestrictionDialogMessage(
+                data.restrictedUntil,
+                "applying to opportunities"
+              )
+          );
+          return;
+        }
+        throw new Error(data.message || "Failed to apply");
+      }
 
       // optimistic update: mark selected as pending and update applications list
       setSelected((s) => ({ ...(s || {}), status: "pending" }));
@@ -564,9 +760,9 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
       // notify user in UI
       showMessage("Application submitted!", "success");
     } catch (err) {
-      const msg = err.message || "Error applying to opportunity";
+      const msg = err.message || "Failed to apply to the opportunity";
       if (msg === "Already applied") {
-        // Already applied — nothing to change for participants count until accepted.
+        // Already applied â€” nothing to change for participants count until accepted.
         // Refresh user's applications to sync UI.
         invalidateApplicationsCache(queryClient);
         await refetchApplications();
@@ -588,7 +784,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     if (!ngoId) return showMessage('NGO id not available', 'error');
 
     // Navigate to Messages and open a temporary DM view for this NGO
-    // Do NOT create a conversation in the database yet — it will be created
+    // Do NOT create a conversation in the database yet â€” it will be created
     // only when the user sends the first message.
     navigate('/home/messages', { state: { openConversationOtherUserId: ngoId, openConversationOtherUserName: ngo && (ngo.fullName || ngo.name) } });
   };
@@ -631,7 +827,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
             try { new Audio('./notify.mp3').play().catch(() => { }); } catch (e) { }
           }
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { }
     };
 
     socket.on('notification', onNotif);
@@ -662,7 +858,6 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   // connect here if not already connected and we have user info).
   useEffect(() => {
     if (me && socket && !socket.connected) {
-      console.debug('Opportunities: connecting socket because me is present');
       socket.connect();
     }
   }, [me]);
@@ -695,18 +890,18 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
       const data = await res.json();
       if (data.success) {
         setImgLink(data.url);
-        console.log("Upload Success:", data.url);
       } else {
         throw new Error(data.message || "Upload failed");
       }
     } catch (err) {
-      setError(err.message || "Error uploading image");
+      setError(err.message || "Failed to upload image");
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleSelect = (opp) => {
+    setShowOpportunityActionMenu(false);
     if (fromDashboard) {
       // Clear the global topbar search input (if present) and navigate to opportunities page
       try {
@@ -723,7 +918,9 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
 
     // When user explicitly opens another opportunity, clear local search and open it
     setSearch("");
-    setStatusFilter("all");
+    if (!isAdmin) {
+      setStatusFilter("all");
+    }
     setClosedManually(false);
     setSelectedBeforeSearch(null);
     setSelected(normalizeOpportunity(opp));
@@ -746,7 +943,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   // - If user clears the search and details were closed by search (not manually), reopen the remembered detail
   useEffect(() => {
     const hasSearch = Boolean(search && search.trim());
-    const hasFilter = Boolean(statusFilter && statusFilter !== "all");
+    const hasFilter = !isAdmin && Boolean(statusFilter && statusFilter !== "all");
 
     // if search/filter has selection and a detail is open -> close it and remember
     if ((hasSearch || hasFilter) && selected) {
@@ -762,7 +959,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
       setSelectedBeforeSearch(null);
     }
     // If user clears search/filter but they had manually closed details earlier, do nothing
-  }, [search, statusFilter]);
+  }, [search, statusFilter, isAdmin, selected, selectedBeforeSearch, closedManually]);
 
   // Sync with the global topbar search input (if present). The app uses the topbar
   // search across pages, so listen to its `input` events and mirror the value.
@@ -772,8 +969,6 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   useEffect(() => {
     const onDocClick = (e) => {
       try {
-        // debug
-        // console.log('doc click', e.target, compositeRef.current);
         if (!compositeRef.current) return;
         if (!compositeRef.current.contains(e.target)) {
           // close when clicked outside
@@ -785,6 +980,23 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     if (compositeOpen) document.addEventListener('click', onDocClick, true);
     return () => document.removeEventListener('click', onDocClick, true);
   }, [compositeOpen]);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      try {
+        if (!opportunityActionMenuRef.current) return;
+        if (!opportunityActionMenuRef.current.contains(e.target)) {
+          setShowOpportunityActionMenu(false);
+        }
+      } catch (err) { }
+    };
+
+    if (showOpportunityActionMenu) {
+      document.addEventListener("click", onDocClick, true);
+    }
+
+    return () => document.removeEventListener("click", onDocClick, true);
+  }, [showOpportunityActionMenu]);
 
   // If navigated here with an `openId` in the route state, open that opportunity in details
   useEffect(() => {
@@ -801,8 +1013,153 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
   // If route state asked to open create modal (from Dashboard), open it
   useEffect(() => {
     if (!loc || !loc.state) return;
-    if (loc.state.openCreate) setShowCreate(true);
-  }, [loc]);
+    if (loc.state.openCreate && isNgo) setShowCreate(true);
+  }, [isNgo, loc]);
+
+  const resetReportModalState = () => {
+    setReportReason("");
+    setReportReasonError(false);
+    setClosingReportModal(false);
+    setModeratingOpportunity(false);
+  };
+
+  const handleOpenReportModal = () => {
+    setShowOpportunityActionMenu(false);
+    resetReportModalState();
+    setShowReportModal(true);
+  };
+
+  const handleCloseReportModal = () => {
+    setClosingReportModal(true);
+    window.setTimeout(() => {
+      setShowReportModal(false);
+      resetReportModalState();
+    }, 220);
+  };
+
+  const handleOpportunityReport = async () => {
+    if (!selected) return;
+
+    const trimmedReason = reportReason.trim();
+    if (!trimmedReason) {
+      setReportReasonError(true);
+      return;
+    }
+
+    setModeratingOpportunity(true);
+    setError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/opportunities/${selected._id || selected.id}/report`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: trimmedReason,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to submit report");
+      }
+
+      handleCloseReportModal();
+      setReportSuccessDialogOpen(true);
+    } catch (err) {
+      const msg = err.message || "Failed to submit report";
+      setError(msg);
+      showMessage(msg, "error");
+    } finally {
+      setModeratingOpportunity(false);
+    }
+  };
+
+  const resetOpportunityModerationState = () => {
+    setOpportunityModerationState({
+      ...DEFAULT_OPPORTUNITY_MODERATION_STATE,
+    });
+  };
+
+  const openOpportunityModerationModal = (mode) => {
+    setShowOpportunityActionMenu(false);
+    setOpportunityModerationState({
+      ...DEFAULT_OPPORTUNITY_MODERATION_STATE,
+      open: true,
+      mode,
+      duration: mode === "suspend" ? "7" : "1",
+    });
+  };
+
+  const closeOpportunityModerationModal = () => {
+    resetOpportunityModerationState();
+    setModeratingOpportunity(false);
+  };
+
+  const updateOpportunityModerationState = (patch) => {
+    setOpportunityModerationState((current) => ({
+      ...current,
+      ...patch,
+    }));
+  };
+
+  const resolveOpportunityModerationDays = () => {
+    if (opportunityModerationState.duration === "custom") {
+      return Number(opportunityModerationState.customDays);
+    }
+
+    return Number(opportunityModerationState.duration);
+  };
+
+  const handleModerateOpportunityOwner = async () => {
+    if (!selected || !opportunityModerationState.mode) return;
+
+    const trimmedReason = opportunityModerationState.reason.trim();
+    if (!trimmedReason) {
+      updateOpportunityModerationState({ reasonError: true });
+      return;
+    }
+
+    const durationDays = resolveOpportunityModerationDays();
+    if (!Number.isFinite(durationDays) || durationDays < 1) {
+      showMessage("Please enter a valid moderation duration.", "error");
+      return;
+    }
+
+    setModeratingOpportunity(true);
+    setError("");
+
+    try {
+      const selectedId = selected._id || selected.id;
+      const res = await fetch(`${API_BASE}/admin/opportunities/${selectedId}/moderate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: opportunityModerationState.mode,
+          durationDays,
+          deleteOpportunity: opportunityModerationState.deleteOpportunity,
+          reason: trimmedReason,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to moderate opportunity owner");
+      }
+
+      if (data.deletedOpportunityId && String(selectedId) === String(data.deletedOpportunityId)) {
+        setSelected(null);
+      }
+      closeOpportunityModerationModal();
+      queryClient.invalidateQueries({ queryKey: ["admin-overview"] }).catch(() => { });
+      showMessage(data.message || "Opportunity owner updated successfully", "success");
+    } catch (err) {
+      const msg = err.message || "Failed to moderate opportunity owner";
+      setError(msg);
+      showMessage(msg, "error");
+    } finally {
+      setModeratingOpportunity(false);
+    }
+  };
 
   return (
     <div className={fromDashboard ? "opportunities-embedded" : "page opportunities-page"}>
@@ -826,31 +1183,42 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                   aria-expanded={compositeOpen}
                   onClick={() => setCompositeOpen((s) => !s)}
                 >
-                  Filter ▾
+                  Filter 
                 </button>
                 <div className="composite-menu" role="menu">
-                  <div className={`menu-group ${scopeFilter === 'all' ? 'group-active' : ''}`}>
-                    <div className="group-title">All Opportunities</div>
-                    <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'all' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('all'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'all', status: 'all' }); }}>All Statuses</button>
-                    <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'open' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('open'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'all', status: 'open' }); }}>Open</button>
-                    <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'in-progress' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('in-progress'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'all', status: 'in-progress' }); }}>In Progress</button>
-                    <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'closed' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('closed'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'all', status: 'closed' }); }}>Closed</button>
-                  </div>
-                  <div className={`menu-group ${scopeFilter === 'mine' ? 'group-active' : ''}`}>
-                    <div className="group-title">My Opportunities</div>
-                    <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'all' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('all'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'mine', status: 'all' }); }}>All Statuses</button>
-                    <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'open' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('open'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'mine', status: 'open' }); }}>Open</button>
-                    <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'in-progress' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('in-progress'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'mine', status: 'in-progress' }); }}>In Progress</button>
-                    <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'closed' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('closed'); setSelected(null); setCompositeOpen(false); console.log('Filter selected', { scope: 'mine', status: 'closed' }); }}>Closed</button>
-                  </div>
+                  {isAdmin ? (
+                    <div className="menu-group group-active">
+                      <div className="group-title">Opportunity status</div>
+                      <button type="button" className={`menu-item ${statusFilter === 'open' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('open'); setSelected(null); setCompositeOpen(false); }}>Open</button>
+                      <button type="button" className={`menu-item ${statusFilter === 'in-progress' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('in-progress'); setSelected(null); setCompositeOpen(false); }}>In Progress</button>
+                      <button type="button" className={`menu-item ${statusFilter === 'closed' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('closed'); setSelected(null); setCompositeOpen(false); }}>Closed</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`menu-group ${scopeFilter === 'all' ? 'group-active' : ''}`}>
+                        <div className="group-title">All Opportunities</div>
+                        <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'all' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('all'); setSelected(null); setCompositeOpen(false); }}>All Statuses</button>
+                        <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'open' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('open'); setSelected(null); setCompositeOpen(false); }}>Open</button>
+                        <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'in-progress' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('in-progress'); setSelected(null); setCompositeOpen(false); }}>In Progress</button>
+                        <button type="button" className={`menu-item ${scopeFilter === 'all' && statusFilter === 'closed' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('closed'); setSelected(null); setCompositeOpen(false); }}>Closed</button>
+                      </div>
+                      <div className={`menu-group ${scopeFilter === 'mine' ? 'group-active' : ''}`}>
+                        <div className="group-title">{isVolunteer ? "My Applications" : "My Opportunities"}</div>
+                        <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'all' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('all'); setSelected(null); setCompositeOpen(false); }}>All Statuses</button>
+                        <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'open' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('open'); setSelected(null); setCompositeOpen(false); }}>Open</button>
+                        <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'in-progress' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('in-progress'); setSelected(null); setCompositeOpen(false); }}>In Progress</button>
+                        <button type="button" className={`menu-item ${scopeFilter === 'mine' && statusFilter === 'closed' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('mine'); setStatusFilter('closed'); setSelected(null); setCompositeOpen(false); }}>Closed</button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
           </div>
-          {!(me && me.role === 'volunteer') && (
-            <button className="btn btn-primary opps-create-btn" onClick={handleOpenCreate}>
-              + Create Opportunity
-            </button>
+          {isNgo && (
+            <ActionButton type="button" icon="plus" tone="primary" minWidth={210} onClick={handleOpenCreate}>
+              Create Opportunity
+            </ActionButton>
           )}
         </div>
       </div>
@@ -872,154 +1240,205 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
 
       {selected && !showApplicantsView && (
         <div className="opps-details-panel">
-          <div className="opps-details-top">
-            <button
-              className="opps-back-btn"
-              type="button"
-              onClick={() => {
-                setSelected(null);
-                setError("");
-                setShowApplicantsView(false);
-                setOpportunityApplicants([]);
-              }}
-            >
-              ← Back to Opportunities
-            </button>
+          <div className="opps-details-hero">
+            <div className="opps-details-hero-main">
+              <ActionButton
+                type="button"
+                icon="back"
+                tone="neutral"
+                size="sm"
+                minWidth={194}
+                className="opps-back-action"
+                onClick={() => {
+                  setShowOpportunityActionMenu(false);
+                  resetOpportunityModerationState();
+                  setSelected(null);
+                  setError("");
+                  setShowApplicantsView(false);
+                  setOpportunityApplicants([]);
+                }}
+              >
+                Back to Opportunities
+              </ActionButton>
 
-            <div className={`status-pill status-${selected.status || "open"}`}>
-              {(selected.status || "open").charAt(0).toUpperCase() +
-                (selected.status || "open").slice(1)}
-            </div>
-          </div>
-
-          <div className="opps-details-top-block">
-            <div>
-              <h3>{selected.title}</h3>
-              <p className="opps-details-subtitle">Volunteer opportunity details</p>
-            </div>
-          </div>
-
-          <div className="opps-details-main-block">
-            <div className="opps-details-description">
-              <h4>Description</h4>
-              <p>{selected.description}</p>
-
-              {Array.isArray(selected.required_skills) &&
-                selected.required_skills.length > 0 && (
-                  <div className="opps-details-section">
-                    <h4>Required Skills</h4>
-                    <div className="skill-list">
-                      {selected.required_skills.map((s, i) => (
-                        <div key={i} className="skill-item">{s}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="opps-details-hero-copy">
+                <span className="opps-details-kicker">Opportunity overview</span>
+                <h3>{selected.title}</h3>
+                <p>
+                  Review the event schedule, location, participation details, and role-based actions in one place.
+                </p>
+              </div>
             </div>
 
-            <div className="opps-details-row">
-              <div className="opps-details-image-wrap">
-                {selected.img_link ? (
-                  <img
-                    src={selected.img_link}
-                    alt={selected.title}
-                    className="opps-details-image full"
-                    onClick={() => setImageOverlay(selected.img_link)}
-                    style={{ cursor: 'zoom-in' }}
-                  />
-                ) : (
-                  <div className="opps-details-image-placeholder">No image</div>
-                )}
+            <div className="opps-details-hero-side">
+              <div className={`status-pill status-${selected.status || "open"}`}>
+                {(selected.status || "open").charAt(0).toUpperCase() +
+                  (selected.status || "open").slice(1)}
               </div>
 
-              <aside className="opps-details-side">
-                <h4>Opportunity Details</h4>
-                <div className="details-list">
-                  <div className="details-item">
-                    <div className="details-icon"><CalendarIcon /></div>
-                    <div className="details-text">
-                      <label>Date : </label>
-                      <span>{selected.date || "Not specified"}</span>
+              {isVolunteer && (
+                <div
+                  className="opps-report-menu-wrap"
+                  ref={opportunityActionMenuRef}
+                >
+                  <button
+                    type="button"
+                    className="opps-report-menu-trigger"
+                    aria-label="Opportunity actions"
+                    onClick={() =>
+                      setShowOpportunityActionMenu((current) => !current)
+                    }
+                  >
+                    <MoreVerticalIcon />
+                  </button>
+                  {showOpportunityActionMenu && (
+                    <div className="opps-report-menu">
+                      <button
+                        type="button"
+                        className="opps-report-menu-item"
+                        onClick={handleOpenReportModal}
+                      >
+                        Report NGO
+                      </button>
                     </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div
+            className={`opps-details-top-content ${
+              Array.isArray(selected.required_skills) &&
+              selected.required_skills.length > 0
+                ? ""
+                : "opps-details-top-content--single"
+            }`}
+          >
+            <div className="opps-details-description-card">
+              <div className="opps-details-panel-head">
+                <h4>Description</h4>
+                <p>Read the full event purpose, work expectations, and context before applying.</p>
+              </div>
+              <div className="opps-details-description">
+                <p>{selected.description}</p>
+              </div>
+            </div>
+
+            {Array.isArray(selected.required_skills) &&
+              selected.required_skills.length > 0 && (
+                <div className="opps-details-section-card">
+                  <div className="opps-details-panel-head">
+                    <h4>Required Skills</h4>
+                    <p>These skills help volunteers understand what the NGO expects for the event.</p>
                   </div>
-                  <div className="details-item">
-                    <div className="details-icon"><ClockIcon /></div>
-                    <div className="details-text">
-                      <label>Duration : </label>
-                      <span>{selected.duration || "Not specified"} {selected.duration == 1 ? "hour" : "hours"}</span>
-                    </div>
-                  </div>
-                  <div className="details-item">
-                    <div className="details-icon"><MapPinIcon /></div>
-                    <div className="details-text">
-                      <label>Location : </label>
-                      <span>{formatLocationDisplay(selected.location, selected.city)}</span>
-                    </div>
-                  </div>
-                  <div className="details-item">
-                    <div className="details-icon"><UsersIcon /></div>
-                    <div className="details-text">
-                      <label>Participants : </label>
-                      <span>{(participantsCountMap[selected._id || selected.id] || 0)} joined</span>
-                    </div>
-                  </div>
-                  <div className="details-item">
-                    <div className="details-icon"><UserIcon /></div>
-                    <div className="details-text">
-                      <label>Posted by : </label>
-                      <span>{(selected.ngo_id && (selected.ngo_id.fullName || selected.ngo_id)) || "N/A"}</span>
-                    </div>
+                  <div className="skill-list">
+                    {selected.required_skills.map((s, i) => (
+                      <div key={i} className="skill-item">{s}</div>
+                    ))}
                   </div>
                 </div>
-                {me?.role !== "volunteer" && String(selected?.ngo_id?._id || selected?.ngo_id) === String(me?.id || me?._id) && (
-                  <div className="opps-details-actions">
-                    <button className="btn details-edit-btn" type="button" onClick={() => handleOpenEdit(selected)}>
-                      <EditIcon /> Edit
-                    </button>
-                    <button className="btn details-delete-btn" type="button" onClick={() => handleDeleteClick(selected)}>
-                      <TrashIcon /> Delete
-                    </button>
-                  </div>
-                )}
-              </aside>
+              )}
+          </div>
+
+          <div className="opps-details-layout opps-details-layout-redesigned">
+            <div className="opps-details-main">
+              <div className="opps-details-media-card">
+                <div className="opps-details-panel-head">
+                  <h4>Event image</h4>
+                  <p>Open the image for a closer look if the NGO uploaded one.</p>
+                </div>
+                <div className="opps-details-image-wrap">
+                  {selected.img_link ? (
+                    <img
+                      src={selected.img_link}
+                      alt={selected.title}
+                      className="opps-details-image full"
+                      onClick={() => setImageOverlay(selected.img_link)}
+                      style={{ cursor: 'zoom-in' }}
+                    />
+                  ) : (
+                    <div className="opps-details-image-placeholder">No image</div>
+                  )}
+                </div>
+              </div>
             </div>
-            {me?.role !== "ngo" && !(me?.role === "volunteer" && selected?.status === "closed") && (
-              <div className="opps-details-footer-btns">
-                <button
-                  className="apply-btn"
-                  onClick={handleApply}
-                  disabled={
-                    isApplying ||
-                    isParticipant ||
-                    (userApp && (userApp.status === "accepted" || userApp.status === "pending" || userApp.status === "rejected"))
-                  }
-                >
-                  <span>
-                    {isApplying
-                      ? "Applying..."
-                      : isParticipant || (userApp && userApp.status === "accepted")
-                        ? "You already joined in this event"
-                        : userApp && userApp.status === "pending"
-                          ? "Application is pending"
-                          : userApp && userApp.status === "rejected"
-                            ? "Your application is rejected"
-                            : "Apply Now"}
-                  </span>
-                </button>
 
-                {userApp && (
-                  <button
-                    className="apply-btn"
+            <aside className="opps-details-side">
+              <div className="opps-details-side-head">
+                <h4>Action Center</h4>
+              </div>
+              <div className="details-list">
+                <div className="details-item">
+                  <div className="details-icon"><CalendarIcon /></div>
+                  <div className="details-text">
+                    <label>Date</label>
+                    <span>{selected.date || "Not specified"}</span>
+                  </div>
+                </div>
+                <div className="details-item">
+                  <div className="details-icon"><ClockIcon /></div>
+                  <div className="details-text">
+                    <label>Duration</label>
+                    <span>{selected.duration || "Not specified"} {selected.duration == 1 ? "hour" : "hours"}</span>
+                  </div>
+                </div>
+                <div className="details-item">
+                  <div className="details-icon"><MapPinIcon /></div>
+                  <div className="details-text">
+                    <label>Location</label>
+                    <span>{formatLocationDisplay(selected.location, selected.city)}</span>
+                  </div>
+                </div>
+                <div className="details-item">
+                  <div className="details-icon"><UsersIcon /></div>
+                  <div className="details-text">
+                    <label>Participants</label>
+                    <span>{(participantsCountMap[selected._id || selected.id] || 0)} joined</span>
+                  </div>
+                </div>
+                <div className="details-item">
+                  <div className="details-icon"><UserIcon /></div>
+                  <div className="details-text">
+                    <label>Posted by</label>
+                    <span>{(selected.ngo_id && (selected.ngo_id.fullName || selected.ngo_id)) || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+              {me?.role !== "volunteer" && String(selected?.ngo_id?._id || selected?.ngo_id) === String(me?.id || me?._id) && (
+                <div className="opps-details-actions">
+                  <ActionButton
                     type="button"
-                    onClick={() => setShowAppView(true)}
+                    icon="edit"
+                    tone="primary"
+                    size="sm"
+                    minWidth={196}
+                    className="opps-detail-action-button"
+                    onClick={() => handleOpenEdit(selected)}
                   >
-                    View Application
-                  </button>
-                )}
-
-                <button
-                  className="apply-btn"
+                    Edit
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    icon="delete"
+                    tone="danger"
+                    size="sm"
+                    minWidth={196}
+                    className="opps-detail-action-button"
+                    onClick={() => handleDeleteClick(selected)}
+                  >
+                    Delete
+                  </ActionButton>
+                </div>
+              )}
+              <div className="opps-details-actions opps-view-location-row">
+                <ActionButton
                   type="button"
+                  icon="location"
+                  tone="info"
+                  size="sm"
+                  minWidth={196}
+                  className="opps-detail-action-button"
                   onClick={() => {
                     const loc = selected && selected.location;
                     if (!loc || loc.type !== 'Point' || !Array.isArray(loc.coordinates) || loc.coordinates.length < 2) {
@@ -1032,14 +1451,95 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                   }}
                 >
                   View Location
+                </ActionButton>
+              </div>
+              {isAdmin && (
+                <div className="opps-admin-moderation">
+                  <div className="opps-admin-moderation-copy">
+                    <strong>Admin Review</strong>
+                    <p>Take direct action on this opportunity if the NGO is violating platform guidelines.</p>
+                  </div>
+                  <div className="opps-details-actions opps-admin-moderation-actions">
+                    <ActionButton
+                      type="button"
+                      icon="restrict"
+                      tone="warning"
+                      size="sm"
+                      minWidth={196}
+                      className="opps-detail-action-button"
+                      onClick={() => openOpportunityModerationModal("restrict")}
+                      disabled={moderatingOpportunity}
+                    >
+                      Restrict NGO
+                    </ActionButton>
+                    <ActionButton
+                      type="button"
+                      icon="suspend"
+                      tone="danger"
+                      size="sm"
+                      minWidth={196}
+                      className="opps-detail-action-button"
+                      onClick={() => openOpportunityModerationModal("suspend")}
+                      disabled={moderatingOpportunity}
+                    >
+                      Suspend NGO
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
+            </aside>
+          </div>
+
+            {!isAdmin && me?.role !== "ngo" && !(me?.role === "volunteer" && selected?.status === "closed") && (
+              <div className="opps-details-footer-btns">
+                {/* Single adaptive apply/status button */}
+                <button
+                  className="button"
+                  onClick={() => {
+                    // If already has an application (pending/accepted/rejected), open the application view
+                    if (userApp) {
+                      setShowAppView(true);
+                      return;
+                    }
+                    // Otherwise prompt confirm dialog to apply
+                    setApplyConfirmOpen(true);
+                  }}
+                  disabled={isApplying}
+                >
+                  <span>
+                    {isApplying
+                      ? "Applying..."
+                      : isParticipant || (userApp && userApp.status === "accepted")
+                        ? "Application Accepted"
+                        : userApp && userApp.status === "pending"
+                          ? "Application Pending"
+                          : userApp && userApp.status === "rejected"
+                            ? "Application Rejected"
+                            : "Apply Now"}
+                  </span>
+                  <svg className="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path
+                      fillRule="evenodd"
+                      d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm4.28 10.28a.75.75 0 000-1.06l-3-3a.75.75 0 10-1.06 1.06l1.72 1.72H8.25a.75.75 0 000 1.5h5.69l-1.72 1.72a.75.75 0 101.06 1.06l3-3z"
+                      clipRule="evenodd"
+                    ></path>
+                  </svg>
                 </button>
+
                 {(isParticipant || (userApp && userApp.status === 'accepted')) && (
                   <button
-                    className="apply-btn"
+                    className="button"
                     type="button"
                     onClick={handleContactNgo}
                   >
                     Contact NGO
+                    <svg className="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path
+                        fillRule="evenodd"
+                        d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm4.28 10.28a.75.75 0 000-1.06l-3-3a.75.75 0 10-1.06 1.06l1.72 1.72H8.25a.75.75 0 000 1.5h5.69l-1.72 1.72a.75.75 0 101.06 1.06l3-3z"
+                        clipRule="evenodd"
+                      ></path>
+                    </svg>
                   </button>
                 )}
               </div>
@@ -1049,7 +1549,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
             {me?.role === "ngo" && String(selected?.ngo_id?._id || selected?.ngo_id) === String(me?.id || me?._id) && (
               <div className="opps-details-footer-btns">
                 <button
-                  className="apply-btn"
+                  className="button"
                   type="button"
                   onClick={async () => {
                     const oppId = selected._id || selected.id;
@@ -1062,7 +1562,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                       const data = await res.json();
                       setOpportunityApplicants(Array.isArray(data) ? data : []);
                     } catch (err) {
-                      showMessage(err.message || 'Error loading applicants', 'error');
+                      showMessage(err.message || 'Failed to load applicants', 'error');
                     } finally {
                       setApplicantsLoading(false);
                     }
@@ -1070,27 +1570,16 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                   }}
                 >
                   View Applications
-                </button>
-                <button
-                  className="apply-btn"
-                  type="button"
-                  onClick={() => {
-                    const loc = selected && selected.location;
-                    if (!loc || loc.type !== 'Point' || !Array.isArray(loc.coordinates) || loc.coordinates.length < 2) {
-                      showMessage('No coordinates available for this opportunity', 'info');
-                      return;
-                    }
-                    const [lat, lon] = loc.coordinates;
-                    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat + ',' + lon)}`;
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                  }}
-                >
-                  View Location
+                  <svg className="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path
+                      fillRule="evenodd"
+                      d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm4.28 10.28a.75.75 0 000-1.06l-3-3a.75.75 0 10-1.06 1.06l1.72 1.72H8.25a.75.75 0 000 1.5h5.69l-1.72 1.72a.75.75 0 101.06 1.06l3-3z"
+                      clipRule="evenodd"
+                    ></path>
+                  </svg>
                 </button>
               </div>
             )}
-          </div>
-
           {showAppView && userApp && (
             <VolunteerApplicationModal
               notif={{
@@ -1103,33 +1592,47 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
               }}
               onClose={() => setShowAppView(false)}
               onAction={refetchApplications}
+              onNotify={showMessage}
             />
           )}
 
           {imageOverlay && (
             <div className="image-overlay" onClick={() => setImageOverlay(null)}>
-              <button className="image-overlay-close" onClick={(e) => { e.stopPropagation(); setImageOverlay(null); }}>← Back</button>
+              <ActionButton
+                type="button"
+                icon="back"
+                tone="neutral"
+                size="sm"
+                minWidth={140}
+                className="image-overlay-close"
+                onClick={(e) => { e.stopPropagation(); setImageOverlay(null); }}
+              >
+                Back
+              </ActionButton>
               <img src={imageOverlay} alt="Fullscreen" className="image-overlay-img" />
             </div>
           )}
+
         </div>
       )}
 
-      {/* NGO: Applications List View — shown inside the details panel area */}
+      {/* NGO: Applications List View â€” shown inside the details panel area */}
       {showApplicantsView && selected && (
         <div className="opp-applicants-view">
           {/* Opportunity title header + back button */}
           <div className="opp-applicants-header">
-            <button
+            <ActionButton
               type="button"
-              className="opps-back-btn"
+              icon="back"
+              tone="neutral"
+              minWidth={140}
               onClick={() => {
                 setShowApplicantsView(false);
                 setSelectedApplicantNotif(null);
               }}
             >
-              ← Back
-            </button>
+              Back
+            </ActionButton>
             <h3 className="opp-applicants-opp-title">{selected.title}</h3>
             <div style={{ width: 90 }} />{/* spacer to balance back btn */}
           </div>
@@ -1165,9 +1668,12 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                     </span>
                   </div>
                   <div className="opp-applicants-col">
-                    <button
+                    <ActionButton
                       type="button"
-                      className="opp-applicants-view-btn"
+                      icon="eye"
+                      tone="info"
+                      size="sm"
+                      minWidth={160}
                       onClick={() => {
                         setSelectedApplicantNotif({
                           _id: app._id,
@@ -1181,7 +1687,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                       }}
                     >
                       View Details
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
               );
@@ -1196,11 +1702,6 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           notif={selectedApplicantNotif}
           onClose={() => setSelectedApplicantNotif(null)}
           onAction={async (applicationId, status) => {
-            // Update in local list
-            setOpportunityApplicants((prev) =>
-              prev.map((a) => (String(a._id) === String(applicationId) ? { ...a, status } : a))
-            );
-            // Call respond endpoint
             try {
               const res = await fetch(`${API_BASE}/applications/${applicationId}/respond`, {
                 method: 'POST',
@@ -1209,12 +1710,31 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                 body: JSON.stringify({ status }),
               });
               const data = await res.json();
-              if (!res.ok) throw new Error(data.message || 'Failed to respond');
-              showMessage(`Application ${status}!`, 'success');
+              if (!res.ok) throw new Error(data.message || 'Failed to respond to the application');
+
+              setOpportunityApplicants((prev) =>
+                prev.map((a) => (String(a._id) === String(applicationId) ? { ...a, status } : a))
+              );
+              setSelectedApplicantNotif((current) =>
+                current
+                  ? { ...current, application: { ...(current.application || {}), status } }
+                  : current
+              );
+
+              const currentOppId = selected?._id || selected?.id;
+              if (currentOppId) {
+                fetchParticipantsCount(currentOppId).catch(() => { });
+              }
+
+              showMessage(
+                status === "accepted"
+                  ? "Application accepted successfully."
+                  : "Application rejected successfully.",
+                'success'
+              );
             } catch (err) {
-              showMessage(err.message || 'Error responding to application', 'error');
+              showMessage(err.message || 'Failed to respond to the application', 'error');
             }
-            setSelectedApplicantNotif((s) => s ? { ...s, application: { ...(s.application || {}), status } } : s);
           }}
         />
       )}
@@ -1254,7 +1774,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
               <div className="posted">Posted {formatRelativeTime(opp.createdAt)}</div>
 
               <button
-                className="btn opps-card-btn"
+                className="button opps-card-btn"
                 type="button"
                 onClick={() => handleSelect(opp)}
               >
@@ -1264,13 +1784,11 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
           </div>
         ))}
         {!loading && filtered.length === 0 && (
-          <div style={{ padding: '60px 20px', textAlign: 'center', width: '100%', gridColumn: '1 / -1' }}>
-            <h1 style={{ color: 'var(--primary, #08C18A)', fontSize: '48px', fontWeight: '900', letterSpacing: '-1.5px', margin: 0 }}>
-              Opportunities not found
-            </h1>
-            <p style={{ color: '#718096', fontSize: '18px', marginTop: '12px' }}>
-              We couldn't find any opportunities matching your current filters.
-            </p>
+          <div style={{ padding: '60px 20px', width: '100%', gridColumn: '1 / -1' }}>
+            <div className="page-header-wrapper">
+              <h1 className="page-header" style={{ color: 'var(--primary, #08C18A)' }}>Opportunities not found</h1>
+              <p className="page-subtitle" style={{ color: '#718096', fontSize: '18px', marginTop: '12px' }}>We couldn't find any opportunities matching your current filters.</p>
+            </div>
           </div>
         )}
       </div>
@@ -1285,7 +1803,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                 className="opps-close-btn"
                 onClick={() => setShowCreate(false)}
               >
-                ✕
+                x
               </button>
             </div>
             <form className="opps-form" onSubmit={editingId ? handleUpdate : handleCreate}>
@@ -1310,6 +1828,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                 <input
                   type="date"
                   value={date}
+                  min={minOpportunityDate}
                   onChange={(e) => setDate(e.target.value)}
                 />
               </div>
@@ -1328,7 +1847,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                 <label>Location</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setMapOpen(true)}>Choose Location</button>
-                  <span style={{ color: '#718096', fontSize: 13 }}>{locationCoords ? `${locationCoords.lat.toFixed(5)}, ${locationCoords.lon.toFixed(5)}` : 'No location selected'}</span>
+                  <span className="opps-location-hint">{locationCoords ? `${locationCoords.lat.toFixed(5)}, ${locationCoords.lon.toFixed(5)}` : 'No location selected'}</span>
                 </div>
               </div>
               <div className="form-row">
@@ -1371,7 +1890,7 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                   {imgLink && !isUploading && (
                     <div className="upload-preview">
                       <img src={imgLink} alt="Preview" />
-                      <button type="button" onClick={() => setImgLink("")} className="remove-img">✕</button>
+                      <button type="button" onClick={() => setImgLink("")} className="remove-img">x</button>
                     </div>
                   )}
                 </div>
@@ -1398,9 +1917,243 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
         </div>
       )}
 
+      {showReportModal && selected && (
+        <div
+          className={`opps-report-overlay ${closingReportModal ? "closing" : ""}`}
+          onClick={handleCloseReportModal}
+        >
+          <div
+            className={`opps-report-modal ${closingReportModal ? "closing" : ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="opps-report-header">
+              <div>
+                <h3>Report NGO</h3>
+                <p>Select the reason for reporting "{selected.title}" to admin.</p>
+              </div>
+              <ActionButton
+                type="button"
+                icon="close"
+                tone="neutral"
+                size="sm"
+                minWidth={124}
+                onClick={handleCloseReportModal}
+              >
+                Close
+              </ActionButton>
+            </div>
+
+            <div className="opps-report-body">
+              <label className="opps-report-label" htmlFor="opportunity-report-reason">
+                Reason
+              </label>
+              <select
+                id="opportunity-report-reason"
+                className={`opps-report-select ${reportReasonError ? "error" : ""}`}
+                value={reportReason}
+                onChange={(e) => {
+                  setReportReason(e.target.value);
+                  if (reportReasonError) setReportReasonError(false);
+                }}
+              >
+                <option value="">Select a reason</option>
+                {OPPORTUNITY_REPORT_REASONS.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {reason}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="opps-report-actions">
+              <ActionButton
+                type="button"
+                icon="report"
+                tone="danger"
+                minWidth={168}
+                onClick={handleOpportunityReport}
+                disabled={moderatingOpportunity}
+              >
+                {moderatingOpportunity ? "Submitting..." : "Report NGO"}
+              </ActionButton>
+              <ActionButton
+                type="button"
+                icon="close"
+                tone="neutral"
+                minWidth={144}
+                onClick={handleCloseReportModal}
+                disabled={moderatingOpportunity}
+              >
+                Close
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {opportunityModerationState.open && selected && (
+        <div
+          className="opps-report-overlay"
+          onClick={() => {
+            if (!moderatingOpportunity) {
+              closeOpportunityModerationModal();
+            }
+          }}
+        >
+          <div
+            className="opps-report-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="opps-report-header">
+              <div>
+                <h3>
+                  {opportunityModerationState.mode === "suspend"
+                    ? "Suspend NGO"
+                    : "Restrict NGO"}
+                </h3>
+                <p>
+                  Review "{selected.title}" and choose the moderation action for the NGO that posted it.
+                </p>
+              </div>
+              <ActionButton
+                type="button"
+                icon="close"
+                tone="neutral"
+                size="sm"
+                minWidth={124}
+                onClick={closeOpportunityModerationModal}
+                disabled={moderatingOpportunity}
+              >
+                Close
+              </ActionButton>
+            </div>
+
+            <div className="opps-report-body">
+              <label className="opps-report-label" htmlFor="opportunity-moderation-reason">
+                Reason
+              </label>
+              <textarea
+                id="opportunity-moderation-reason"
+                className={`opps-report-input ${opportunityModerationState.reasonError ? "error" : ""}`}
+                value={opportunityModerationState.reason}
+                onChange={(e) =>
+                  updateOpportunityModerationState({
+                    reason: e.target.value,
+                    reasonError: false,
+                  })
+                }
+                placeholder="Explain why this opportunity needs admin action."
+                rows={5}
+                style={{ minHeight: 120, resize: "vertical" }}
+              />
+
+              <div className="opps-report-suggestions">
+                {OPPORTUNITY_MODERATION_REASON_PRESETS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className={`opps-report-chip ${opportunityModerationState.reason === reason ? "active" : ""}`}
+                    onClick={() =>
+                      updateOpportunityModerationState({
+                        reason,
+                        reasonError: false,
+                      })
+                    }
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+
+              <div className="opps-report-duration">
+                <label className="opps-report-label" htmlFor="opportunity-moderation-duration">
+                  Duration
+                </label>
+                <select
+                  id="opportunity-moderation-duration"
+                  className="opps-report-select"
+                  value={opportunityModerationState.duration}
+                  onChange={(e) =>
+                    updateOpportunityModerationState({
+                      duration: e.target.value,
+                    })
+                  }
+                >
+                  {OPPORTUNITY_MODERATION_DURATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {opportunityModerationState.duration === "custom" && (
+                  <input
+                    type="number"
+                    min="1"
+                    className="opps-report-input"
+                    value={opportunityModerationState.customDays}
+                    onChange={(e) =>
+                      updateOpportunityModerationState({
+                        customDays: e.target.value,
+                      })
+                    }
+                    placeholder="Enter number of days"
+                  />
+                )}
+              </div>
+
+              <label className="opps-report-checkbox">
+                <input
+                  type="checkbox"
+                  checked={opportunityModerationState.deleteOpportunity}
+                  onChange={(e) =>
+                    updateOpportunityModerationState({
+                      deleteOpportunity: e.target.checked,
+                    })
+                  }
+                />
+                Delete this opportunity from listings
+              </label>
+            </div>
+
+            <div className="opps-report-actions">
+              <ActionButton
+                type="button"
+                icon={opportunityModerationState.mode === "suspend" ? "suspend" : "restrict"}
+                tone={opportunityModerationState.mode === "suspend" ? "danger" : "warning"}
+                minWidth={174}
+                onClick={handleModerateOpportunityOwner}
+                disabled={moderatingOpportunity}
+              >
+                {moderatingOpportunity
+                  ? "Submitting..."
+                  : opportunityModerationState.mode === "suspend"
+                    ? "Suspend NGO"
+                    : "Restrict NGO"}
+              </ActionButton>
+              <ActionButton
+                type="button"
+                icon="close"
+                tone="neutral"
+                minWidth={144}
+                onClick={closeOpportunityModerationModal}
+                disabled={moderatingOpportunity}
+              >
+                Close
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       <MapPicker
         open={mapOpen}
-        initial={locationCoords ? [locationCoords.lat, locationCoords.lon] : null}
+        initial={
+          locationCoords
+            ? [locationCoords.lat, locationCoords.lon]
+            : (me?.location?.coordinates?.length === 2
+              ? [me.location.coordinates[1], me.location.coordinates[0]]
+              : null)
+        }
         onCancel={() => setMapOpen(false)}
         onChoose={(val) => {
           // val: { lat, lon, city }
@@ -1420,10 +2173,43 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
         confirming={deleting}
         danger={true}
       />
+      {/* Apply confirm dialog */}
+      <ConfirmDialog
+        open={applyConfirmOpen}
+        message={`Are you sure you want to apply for "${selected?.title || 'this opportunity'}"?`}
+        onConfirm={async () => {
+          setApplyConfirmOpen(false);
+          await handleApply();
+        }}
+        onCancel={() => setApplyConfirmOpen(false)}
+        confirmLabel="Apply"
+        cancelLabel="Cancel"
+        confirming={isApplying}
+        danger={false}
+        buttonType="apply"
+      />
+      <ConfirmDialog
+        open={reportSuccessDialogOpen}
+        title="Reported"
+        message="Thank you for reporting. Our admin team will review this issue."
+        onConfirm={() => setReportSuccessDialogOpen(false)}
+        onCancel={() => setReportSuccessDialogOpen(false)}
+        confirmLabel="Close"
+        hideCancel={true}
+        buttonType="report"
+      />
+      <ConfirmDialog
+        open={restrictionDialog.open}
+        message={restrictionDialog.message}
+        onConfirm={closeRestrictionDialog}
+        onCancel={closeRestrictionDialog}
+        confirmLabel="OK"
+        cancelLabel="Close"
+      />
       {notification.open && (
         <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
       )}
-      <Loading isLoading={fetchedLoading || creating || isUploading || deleting || isApplying} />
+      <Loading isLoading={fetchedLoading || creating || isUploading || deleting || isApplying || moderatingOpportunity} />
     </div>
   );
 };
@@ -1436,3 +2222,4 @@ const formatLocationDisplay = (loc, cityVal) => {
 };
 
 export default Opportunities;
+

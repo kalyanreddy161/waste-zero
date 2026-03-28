@@ -1,6 +1,15 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const { sendVerificationEmail } = require("../services/EmailService");
+const Application = require("../models/Application");
+const Opportunity = require("../models/Opportunities");
+const Schedule = require("../models/Schedule");
+const Notification = require("../models/Notification");
+const PushSubscription = require("../models/PushSubscription");
+const Conversation = require("../models/Conversation");
+const Message = require("../models/Message");
+const AdminLog = require("../models/AdminLog");
+const Feedback = require("../models/Feedback");
 
 /* ======================
 	 UPDATE PROFILE DETAILS
@@ -175,6 +184,141 @@ exports.sendOTPForUpdate = async (req, res) => {
 	} catch (error) {
 		console.error("sendOTPForUpdate error:", error);
 		res.status(500).json({ message: "Server error" });
+	}
+};
+
+/* ======================
+	 DELETE ACCOUNT
+	 Accepts: password
+	 Permanently removes the account and related activity after password confirmation.
+====================== */
+exports.deleteAccount = async (req, res) => {
+	try {
+		const userId = req.session?.user?.id;
+		if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+		const password = String(req.body?.password || "");
+		if (!password) return res.status(400).json({ message: "Password is required" });
+
+		const user = await User.findById(userId);
+		if (!user) return res.status(404).json({ message: "User not found" });
+
+		const isMatch = await bcrypt.compare(password, user.password);
+		if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
+
+		const isVolunteer = user.role === "volunteer";
+		const isNgo = user.role === "ngo";
+
+		const [opportunityIds, volunteerPickupIds, claimedPickupIds, conversationIds] = await Promise.all([
+			isNgo ? Opportunity.find({ ngo_id: user._id }).distinct("_id") : Promise.resolve([]),
+			isVolunteer ? Schedule.find({ userId: user._id }).distinct("_id") : Promise.resolve([]),
+			isNgo ? Schedule.find({ ngoId: user._id }).distinct("_id") : Promise.resolve([]),
+			Conversation.find({ participants: user._id }).distinct("_id"),
+		]);
+
+		const applicationFilters = [
+			...(isVolunteer ? [{ volunteerId: user._id }] : []),
+			...(opportunityIds.length ? [{ opportunityId: { $in: opportunityIds } }] : []),
+		];
+
+		const applicationIds = applicationFilters.length
+			? await Application.find({ $or: applicationFilters }).distinct("_id")
+			: [];
+
+		const cleanupOperations = [
+			applicationFilters.length
+				? Application.deleteMany({ $or: applicationFilters })
+				: Promise.resolve(),
+			isNgo
+				? Opportunity.deleteMany({ ngo_id: user._id })
+				: Promise.resolve(),
+			isVolunteer
+				? Schedule.deleteMany({ userId: user._id })
+				: Promise.resolve(),
+			isNgo && claimedPickupIds.length
+				? Schedule.updateMany(
+					{ _id: { $in: claimedPickupIds }, status: { $in: ["scheduled", "accepted"] } },
+					{
+						$set: { status: "scheduled" },
+						$unset: { ngoId: "", agent: "", co2Saved: "" },
+					}
+				)
+				: Promise.resolve(),
+			isNgo && claimedPickupIds.length
+				? Schedule.updateMany(
+					{ _id: { $in: claimedPickupIds }, status: "completed" },
+					{ $unset: { ngoId: "", agent: "" } }
+				)
+				: Promise.resolve(),
+			Notification.deleteMany({
+				$or: [
+					{ receiverId: user._id },
+					{ senderId: user._id },
+					...(conversationIds.length ? [{ conversationId: { $in: conversationIds } }] : []),
+					...(applicationIds.length ? [{ application_id: { $in: applicationIds } }] : []),
+				],
+			}),
+			PushSubscription.deleteMany({ userId: user._id }),
+			Message.deleteMany({
+				$or: [
+					{ sender_id: user._id },
+					{ receiver_id: user._id },
+					...(conversationIds.length ? [{ conversationId: { $in: conversationIds } }] : []),
+				],
+			}),
+			Conversation.deleteMany({ participants: user._id }),
+			Feedback.deleteMany({ username: user.username }),
+		];
+
+		await Promise.all(cleanupOperations);
+
+		let releasedPickups = [];
+		if (isNgo && claimedPickupIds.length) {
+			releasedPickups = await Schedule.find({ _id: { $in: claimedPickupIds } })
+				.populate("userId", "fullName email phone")
+				.populate("ngoId", "fullName email phone")
+				.lean();
+		}
+
+		await AdminLog.create({
+			action: `${user.fullName} (@${user.username}) permanently deleted their WasteZero account.`,
+			user_id: user._id,
+		});
+
+		await User.deleteOne({ _id: user._id });
+
+		if (global.io) {
+			opportunityIds.forEach((id) => {
+				global.io.emit("opportunity:deleted", { id: String(id) });
+			});
+
+			volunteerPickupIds.forEach((id) => {
+				global.io.emit("pickup:deleted", { id: String(id) });
+			});
+
+			releasedPickups.forEach((pickup) => {
+				global.io.emit("pickup:updated", pickup);
+			});
+
+			const admins = await User.find({ role: "admin", _id: { $ne: user._id } }).select("_id").lean();
+			admins.forEach((admin) => {
+				global.io.to(String(admin._id)).emit("admin:moderation-updated", {
+					userId: String(user._id),
+					moderationStatus: "deleted",
+				});
+			});
+
+			global.io.to(String(user._id)).emit("account:deleted", {
+				userId: String(user._id),
+			});
+		}
+
+		req.session.destroy(() => {
+			res.status(200).json({ message: "Account deleted permanently" });
+		});
+	} catch (error) {
+		console.error("deleteAccount error:", error);
+		res.status(500).json({ message: "Failed to delete account" });
 	}
 };
 

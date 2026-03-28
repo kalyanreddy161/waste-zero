@@ -41,9 +41,7 @@ export const updateApplicationInCache = (queryClient, appId, status) => {
         String(app._id) === String(appId) ? { ...app, status } : app
       );
     });
-  } catch (e) {
-    console.error("Failed to update application cache:", e);
-  }
+  } catch (e) { }
 };
 
 /**
@@ -55,7 +53,5 @@ export const updateApplicationInCache = (queryClient, appId, status) => {
 export const invalidateApplicationsCache = (queryClient) => {
   try {
     queryClient.invalidateQueries({ queryKey: ["applications"] });
-  } catch (e) {
-    console.error("Failed to invalidate applications cache:", e);
-  }
+  } catch (e) { }
 };

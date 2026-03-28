@@ -34,6 +34,46 @@ const userSchema = new mongoose.Schema(
       required: true
     },
 
+    accountStatus: {
+      type: String,
+      enum: ["active", "suspended"],
+      default: "active"
+    },
+
+    suspendedUntil: {
+      type: Date,
+      default: null
+    },
+
+    suspensionReason: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
+    suspendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null
+    },
+
+    restrictedUntil: {
+      type: Date,
+      default: null
+    },
+
+    restrictionReason: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
+    restrictedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null
+    },
+
     skills: {
       type: [String],
       default: []
@@ -59,8 +99,6 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
-    otp: Number,
-    otpExpiresAt: Date,
     otp: Number,
     otpExpiresAt: Date
   },
