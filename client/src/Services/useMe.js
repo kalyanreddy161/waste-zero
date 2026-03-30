@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 // Central API base for the client. Override with Vite env: VITE_API_URL
-export const API_BASE = "http://localhost:3000";
+export const API_BASE = import.meta.env.VITE_API_URL;
 
 export const fetchMe = async () => {
   const res = await fetch(`${API_BASE}/me`, {
