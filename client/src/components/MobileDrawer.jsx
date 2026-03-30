@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useIsMobile from "../Services/useIsMobile";
 import "../styles/MobileNav.css";
@@ -12,6 +12,7 @@ const BackIcon = () => (
 const MobileDrawer = ({
   open,
   onClose,
+  onLogout,
   me,
   currentPageLabel,
   customLinks = [],
@@ -21,6 +22,9 @@ const MobileDrawer = ({
 }) => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    typeof document !== "undefined" ? document.documentElement.classList.contains("dark") : false
+  );
 
   useEffect(() => {
     if (!isMobile) return;
@@ -31,6 +35,18 @@ const MobileDrawer = ({
       script.defer = true;
       document.body.appendChild(script);
     }
+
+    const handleThemeChange = (event) => {
+      const nextTheme = event?.detail?.theme;
+      if (nextTheme) {
+        setIsDarkMode(nextTheme === "dark");
+      } else {
+        setIsDarkMode(document.documentElement.classList.contains("dark"));
+      }
+    };
+
+    window.addEventListener("themechange", handleThemeChange);
+    return () => window.removeEventListener("themechange", handleThemeChange);
   }, [isMobile]);
 
   if (!isMobile) return null;
@@ -46,7 +62,7 @@ const MobileDrawer = ({
             <lord-icon
               src="https://cdn.lordicon.com/zruuduya.json"
               trigger="hover"
-              colors={`primary:#121331,secondary:#08C18A`}
+              colors={`primary:${isDarkMode ? "#f5f7fb" : "#121331"},secondary:${isDarkMode ? "#08C18A" : "#08C18A"}`}
               style={{ width: 40, height: 40 }}
             ></lord-icon>
             <div>
@@ -56,59 +72,72 @@ const MobileDrawer = ({
           </div>
         </div>
 
-        <div className="drawer-user">
-          <div className="drawer-user-name">{me?.fullName || "Guest user"}</div>
+        <div className="mobile-drawer-body">
+          <div className="drawer-user">
+            <div className="drawer-user-name">{me?.fullName || "Guest user"}</div>
+          </div>
+
+          {currentPageLabel && (
+            <div className="drawer-section">
+              <p className="drawer-section-label">Now viewing</p>
+              <div className="drawer-current">{currentPageLabel}</div>
+            </div>
+          )}
+
+          {customLinks.length > 0 && (
+            <div className="drawer-section">
+              <p className="drawer-section-label">Quick links</p>
+              <div className="drawer-quick-list">
+                {customLinks.map((link) => (
+                  <button
+                    key={link.key}
+                    className={`drawer-quick-btn ${activeCustomKey === link.key ? "active" : ""}`}
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("mobile:custom-link", { detail: { page: customPageKey, key: link.key } })
+                      );
+                      onClose?.();
+                    }}
+                  >
+                    <span className="drawer-quick-label">{link.label}</span>
+                    <span aria-hidden>›</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {secondaryLinks.length > 0 && (
+            <div className="drawer-section drawer-secondary">
+              <p className="drawer-section-label">More navigation</p>
+              <div className="drawer-link-stack">
+                {secondaryLinks.map((link) => (
+                  <button
+                    key={link.to || link.action || link.label}
+                    className={`drawer-nav-btn ${link.action === "logout" ? "logout" : ""}`}
+                    onClick={async () => {
+                      if (link.action === "logout") {
+                        await onLogout?.();
+                        onClose?.();
+                        return;
+                      }
+
+                      if (link.onClick) {
+                        link.onClick();
+                      } else if (link.to) {
+                        navigate(link.to);
+                      }
+                      onClose?.();
+                    }}
+                  >
+                    {link.icon && <img src={link.icon} alt="" />}
+                    <span>{link.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-
-        {currentPageLabel && (
-          <div className="drawer-section">
-            <p className="drawer-section-label">Now viewing</p>
-            <div className="drawer-current">{currentPageLabel}</div>
-          </div>
-        )}
-
-        {customLinks.length > 0 && (
-          <div className="drawer-section">
-            <p className="drawer-section-label">Custom links</p>
-            <div className="drawer-chip-grid">
-              {customLinks.map((link) => (
-                <button
-                  key={link.key}
-                  className={`drawer-chip ${activeCustomKey === link.key ? "active" : ""}`}
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent("mobile:custom-link", { detail: { page: customPageKey, key: link.key } })
-                    );
-                    onClose?.();
-                  }}
-                >
-                  {link.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {secondaryLinks.length > 0 && (
-          <div className="drawer-section">
-            <p className="drawer-section-label">More navigation</p>
-            <div className="drawer-link-stack">
-              {secondaryLinks.map((link) => (
-                <button
-                  key={link.to}
-                  className="drawer-nav-btn"
-                  onClick={() => {
-                    navigate(link.to);
-                    onClose?.();
-                  }}
-                >
-                  {link.icon && <img src={link.icon} alt="" />}
-                  <span>{link.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
       <div className={`mobile-drawer-scrim ${open ? "open" : ""}`} onClick={onClose} />
     </>

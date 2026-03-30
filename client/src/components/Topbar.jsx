@@ -925,9 +925,21 @@ export default function Topbar({ onMenuClick }) {
         {showSearchResults && (
           <div
             ref={searchResultsRef}
-            className="topbar-search-results"
+            className={`topbar-search-results ${isMobile ? "topbar-search-results--mobile" : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
+            {isMobile && (
+              <div className="topbar-search-results__mobile-bar">
+                <span>Search results</span>
+                <button
+                  type="button"
+                  aria-label="Close search"
+                  onClick={() => setShowSearchResults(false)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
             {/* Toggle Switch */}
             {me && !isAdmin && (
               <label className="search-results-switch" aria-label="Toggle Search Filter">
@@ -1077,6 +1089,10 @@ export default function Topbar({ onMenuClick }) {
 
         {open && (
           <div className="topbar-menu">
+            <div className="topbar-menu__header">
+              <span>Account</span>
+              <button className="topbar-menu-close" aria-label="Close menu" onClick={() => setOpen(false)}>×</button>
+            </div>
             <div className="menu-content">
               <div className="menu-name">{me?.fullName || "Guest"}</div>
               <label className="menu-theme-row">

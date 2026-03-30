@@ -292,9 +292,6 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
     if (scopeFilter !== "all") {
       setScopeFilter("all");
     }
-    if (!initialStatusFilter && statusFilter === "all") {
-      setStatusFilter("open");
-    }
   }, [initialStatusFilter, isAdmin, scopeFilter, statusFilter]);
 
   // Helper: haversine distance in meters
@@ -1172,8 +1169,8 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
             </p>
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             {!hideFilter && (
               <div ref={compositeRef} className={`opps-composite-filter ${compositeOpen ? 'open' : ''}`}>
                 <button
@@ -1186,9 +1183,18 @@ const Opportunities = ({ fromDashboard, hideFilter, hideHeader, initialScopeFilt
                   Filter 
                 </button>
                 <div className="composite-menu" role="menu">
+                  <button
+                    type="button"
+                    className="composite-close"
+                    aria-label="Close filters"
+                    onClick={() => setCompositeOpen(false)}
+                  >
+                    ×
+                  </button>
                   {isAdmin ? (
                     <div className="menu-group group-active">
                       <div className="group-title">Opportunity status</div>
+                      <button type="button" className={`menu-item ${statusFilter === 'all' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('all'); setSelected(null); setCompositeOpen(false); }}>All Statuses</button>
                       <button type="button" className={`menu-item ${statusFilter === 'open' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('open'); setSelected(null); setCompositeOpen(false); }}>Open</button>
                       <button type="button" className={`menu-item ${statusFilter === 'in-progress' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('in-progress'); setSelected(null); setCompositeOpen(false); }}>In Progress</button>
                       <button type="button" className={`menu-item ${statusFilter === 'closed' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setScopeFilter('all'); setStatusFilter('closed'); setSelected(null); setCompositeOpen(false); }}>Closed</button>

@@ -1488,6 +1488,18 @@ const Messages = () => {
           <>
             {/* ─── Header ─── */}
             <div className="msg-conv-header">
+              {isMobile && (
+                <button
+                  className="msg-mobile-back"
+                  aria-label="Back to conversations"
+                  onClick={() => {
+                    setActiveConv(null);
+                    setMobileView("list");
+                  }}
+                >
+                  <BackArrowIcon />
+                </button>
+              )}
               <Avatar name={activeConv.name} size={40} />
               <div className="header-info">
                 <div className="header-name">{activeConv.name}</div>

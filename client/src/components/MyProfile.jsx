@@ -538,7 +538,7 @@ const MyProfile = () => {
                               emailError || (!newEmail ? "Please enter email first" : (otpSent ? "OTP sent" : "")),
                               <ActionButton
                                 type="button"
-                                icon="mail"
+                                icon={null}
                                 tone="info"
                                 size="sm"
                                 minWidth={140}

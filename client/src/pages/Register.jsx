@@ -8,6 +8,21 @@ import { API_BASE, meQueryOptions } from "../Services/useMe";
 
 const API = `${API_BASE}/auth`;
 
+const REGISTER_OVERVIEW_ITEMS = [
+  {
+    title: "Community opportunities",
+    text: "NGOs can publish clean-up drives, collection tasks, and awareness activities that volunteers can discover from one place.",
+  },
+  {
+    title: "Pickup coordination",
+    text: "Schedule, assign, and complete waste collection requests with clear location details and status updates.",
+  },
+  {
+    title: "Impact reporting",
+    text: "Track completed work, recycling progress, and CO2 savings so every contribution is easy to review and share.",
+  },
+];
+
 export default function Register() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -148,6 +163,7 @@ export default function Register() {
       resetForgotPasswordState();
     }
     window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
       if (authCardRef.current) {
         authCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -521,46 +537,48 @@ export default function Register() {
 
   return (
     <>
-      <div className="register-container">
-        <div className="register-left">
-          <div className="register-logo">
-            <lord-icon
-              src="https://cdn.lordicon.com/zruuduya.json"
-              trigger="hover"
-              colors="primary:#121331,secondary:#ffffff"
-              style={{ width: "50px", height: "50px" }}
-            ></lord-icon>
-            <span> WasteZero</span>
-          </div>
+      <div className="register-page">
+        <main className="register-shell">
+          <div className="register-container">
+            <div className="register-left">
+              <div className="register-logo">
+                <lord-icon
+                  src="https://cdn.lordicon.com/zruuduya.json"
+                  trigger="hover"
+                  colors="primary:#121331,secondary:#ffffff"
+                  style={{ width: "50px", height: "50px" }}
+                ></lord-icon>
+                <span> WasteZero</span>
+              </div>
 
-          <h1 className="register-heading">Join the Recycling Revolution</h1>
+              <h1 className="register-heading">Join the Recycling Revolution</h1>
 
-          <p className="register-description">
-            WasteZero connects volunteers, NGOs, and administrators to schedule
-            pickups, manage recycling opportunities, and make a positive impact
-            on our environment.
-          </p>
+              <p className="register-description">
+                WasteZero connects volunteers, NGOs, and administrators to schedule
+                pickups, manage recycling opportunities, and make a positive impact
+                on our environment.
+              </p>
 
-          <div className="register-features">
-            <div>
-              <h4>Schedule Pickups</h4>
-              <p>Easily arrange waste collection</p>
+              <div className="register-features">
+                <div>
+                  <h4>Schedule Pickups</h4>
+                  <p>Easily arrange waste collection</p>
+                </div>
+
+                <div>
+                  <h4>Track Impact</h4>
+                  <p>Monitor your environmental contribution</p>
+                </div>
+
+                <div>
+                  <h4>Volunteer</h4>
+                  <p>Join recycling initiatives</p>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <h4>Track Impact</h4>
-              <p>Monitor your environmental contribution</p>
-            </div>
-
-            <div>
-              <h4>Volunteer</h4>
-              <p>Join recycling initiatives</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="register-right page-center">
-          <div className="auth-card" ref={authCardRef}>
+            <div className="register-right page-center">
+              <div className="auth-card" ref={authCardRef}>
 
             {/* Tabs */}
             <div className="tab-header">
@@ -944,18 +962,54 @@ export default function Register() {
 
               </div>
             </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <section className="register-overview" aria-labelledby="register-overview-title">
+            <div className="register-overview__copy">
+              <span className="register-overview__eyebrow">Quick overview</span>
+              <h2 id="register-overview-title">A unified workspace for community action</h2>
+              <p>
+                WasteZero brings volunteers, NGOs, and administrators into one workspace to organize opportunities, coordinate pickups, and monitor environmental impact with clarity.
+              </p>
+              <div className="register-overview__highlights" aria-label="Platform highlights">
+                <span>Publish opportunities</span>
+                <span>Manage pickup requests</span>
+                <span>Review impact metrics</span>
+              </div>
+            </div>
+
+            <div className="register-overview__grid">
+              {REGISTER_OVERVIEW_ITEMS.map((item) => (
+                <article key={item.title} className="register-overview__card">
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        </main>
+
       {notification.open && (
         <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
       )}
       <footer className="register-footer">
-        <div className="register-footer__meta">
-          <span className="register-footer__brand">WasteZero</span>
-          <a className="register-footer__mail" href="mailto:support@wastezero.com">support@wastezero.com</a>
+        <div className="register-footer__copy">
+          <h2>Need help getting started?</h2>
+          <p>
+            Reach WasteZero for onboarding support, account help, or questions about volunteering,
+            NGO opportunities, and recycling pickups.
+          </p>
+          <div className="register-footer__support">
+            <a className="register-footer__mail" href="mailto:support@wastezero.com">
+              support@wastezero.com
+            </a>
+            <span>Built for volunteers, NGOs, and WasteZero admins</span>
+          </div>
         </div>
         <div className="register-footer__actions">
+          <a className="register-footer__btn mail" href="mailto:support@wastezero.com">Email Support</a>
           <button
             type="button"
             className="register-footer__btn ghost"
@@ -972,6 +1026,7 @@ export default function Register() {
           </button>
         </div>
       </footer>
+      </div>
     </>
   );
 }

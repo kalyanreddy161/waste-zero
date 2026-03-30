@@ -76,6 +76,40 @@ export default function MyImpact() {
 
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
+  const isCompactChart = isMobile;
+  const chartHeight = isCompactChart ? 320 : 400;
+  const axisTickStyle = {
+    fill: "var(--chart-text)",
+    fontWeight: 600,
+    fontSize: isCompactChart ? 11 : 13,
+  };
+  const xAxisProps = isCompactChart
+    ? {
+        interval: 0,
+        minTickGap: 0,
+        tickMargin: 12,
+        height: 60,
+        angle: -28,
+        textAnchor: "end",
+        padding: { left: 0, right: 0 },
+      }
+    : {
+        interval: "preserveStartEnd",
+        minTickGap: 6,
+        tickMargin: 14,
+        height: 30,
+        angle: 0,
+        textAnchor: "middle",
+        padding: { left: 8, right: 16 },
+      };
+  const barChartMargin = isCompactChart
+    ? { top: 18, right: 14, left: 0, bottom: 54 }
+    : { top: 20, right: 30, left: 20, bottom: 8 };
+  const lineChartMargin = isCompactChart
+    ? { top: 18, right: 18, left: 4, bottom: 54 }
+    : { top: 20, right: 30, left: 40, bottom: 8 };
+  const yAxisWidth = isCompactChart ? 34 : 42;
+  const chartStrokeWidth = isCompactChart ? 3 : 4;
 
   const [oppYear, setOppYear] = useState(currentYear);
   const [pickupYear, setPickupYear] = useState(currentYear);
@@ -384,12 +418,12 @@ export default function MyImpact() {
               <YearSelect value={oppYear} onChange={setOppYear} />
             </div>
           </div>
-          <div style={{ width: '100%', height: 400 }}>
+          <div style={{ width: '100%', height: chartHeight }}>
             <ResponsiveContainer>
-              <BarChart key={`opp-${oppYear}-${isOppVisible}-${activeTab}`} data={oppData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <BarChart key={`opp-${oppYear}-${isOppVisible}-${activeTab}`} data={oppData} margin={barChartMargin}>
                 <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-text)', fontWeight: 500 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-text)', fontWeight: 500 }} dx={-10} allowDecimals={false} />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={axisTickStyle} {...xAxisProps} dy={isCompactChart ? 8 : 10} />
+                <YAxis axisLine={false} tickLine={false} tick={axisTickStyle} width={yAxisWidth} dx={isCompactChart ? -2 : -10} allowDecimals={false} />
                 <Tooltip cursor={false} content={<CustomTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                 <Bar
@@ -398,7 +432,7 @@ export default function MyImpact() {
                   name="Total Opportunities"
                   fill="#0F766E"
                   radius={[6, 6, 0, 0]}
-                  barSize={32}
+                  barSize={isCompactChart ? 24 : 32}
                 />
                 <Bar
                   isAnimationActive={isOppVisible}
@@ -406,7 +440,7 @@ export default function MyImpact() {
                   name={role === 'volunteer' ? "Opportunities Joined" : "Your Opportunities"}
                   fill="#08C18A"
                   radius={[6, 6, 0, 0]}
-                  barSize={32}
+                  barSize={isCompactChart ? 24 : 32}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -424,12 +458,12 @@ export default function MyImpact() {
               <YearSelect value={pickupYear} onChange={setPickupYear} />
             </div>
           </div>
-          <div style={{ width: '100%', height: 400 }}>
+          <div style={{ width: '100%', height: chartHeight }}>
             <ResponsiveContainer>
-              <LineChart key={`pickup-${pickupYear}-${isPickupVisible}-${activeTab}`} data={pickupData} margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
+              <LineChart key={`pickup-${pickupYear}-${isPickupVisible}-${activeTab}`} data={pickupData} margin={lineChartMargin}>
                 <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-text)', fontWeight: 500 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-text)', fontWeight: 500 }} dx={-10} allowDecimals={false} />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={axisTickStyle} {...xAxisProps} dy={isCompactChart ? 8 : 10} />
+                <YAxis axisLine={false} tickLine={false} tick={axisTickStyle} width={yAxisWidth} dx={isCompactChart ? -2 : -10} allowDecimals={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                 <Line
@@ -438,9 +472,9 @@ export default function MyImpact() {
                   dataKey="count"
                   name="Completed Pickups"
                   stroke="#08C18A"
-                  strokeWidth={4}
+                  strokeWidth={chartStrokeWidth}
                   dot={(props) => <BlinkingDot {...props} dataLength={pickupData.length} fill="#08C18A" />}
-                  activeDot={{ r: 8, fill: '#08C18A', stroke: 'var(--surface-primary)' }}
+                  activeDot={{ r: isCompactChart ? 6 : 8, fill: '#08C18A', stroke: 'var(--surface-primary)' }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -489,13 +523,13 @@ export default function MyImpact() {
             </div>
           </div>
 
-          <div style={{ width: '100%', height: 400 }}>
+          <div style={{ width: '100%', height: chartHeight }}>
             <ResponsiveContainer>
               {co2ChartType === 'line' ? (
-                <LineChart key={`co2-line-${co2Year}-${isCo2Visible}-${activeTab}`} data={co2LineData} margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
+                <LineChart key={`co2-line-${co2Year}-${isCo2Visible}-${activeTab}`} data={co2LineData} margin={lineChartMargin}>
                   <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-text)', fontWeight: 500 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-text)', fontWeight: 500 }} dx={-10} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={axisTickStyle} {...xAxisProps} dy={isCompactChart ? 8 : 10} />
+                  <YAxis axisLine={false} tickLine={false} tick={axisTickStyle} width={yAxisWidth} dx={isCompactChart ? -2 : -10} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                   <Line
@@ -504,9 +538,9 @@ export default function MyImpact() {
                     dataKey="co2"
                     name="CO₂ Saved (kg)"
                     stroke="#08C18A"
-                    strokeWidth={4}
+                    strokeWidth={chartStrokeWidth}
                     dot={(props) => <BlinkingDot {...props} dataLength={co2LineData.length} fill="#08C18A" />}
-                    activeDot={{ r: 8, fill: 'var(--text-primary)', stroke: 'var(--surface-primary)' }}
+                    activeDot={{ r: isCompactChart ? 6 : 8, fill: 'var(--text-primary)', stroke: 'var(--surface-primary)' }}
                   />
                 </LineChart>
               ) : (

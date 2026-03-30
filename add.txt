@@ -291,12 +291,10 @@ few more:
 
 
 
-1.whatever you done in last response for register.jsx undo that chnages i want previous stage.
-present only mobile screens holds the overview info make i visible for desktop also don't change login ui see the image. below this whole page add information of overview and footer.footer should place at bottom and occupie 100% width (onclick login or createaccount scroll to top, follow the bg color pattern don't change it).
-2.in message chat also whatever you done in last response undo the changes.i want for mobile screens in click link icon in messageinput  show options camara , file.so user choose whatever tey want and make sure both buttons functional.
-3.you forgot some buttons to apply new button style.restrict, suspend while enter reason in admin logs , restore access button . apply button styles for this also.
+1. add information of overview (see help and support page for data don't design exact like help & support page redesign here with minimal matter ) below login and above footer in register.jsx.redesign the footer with exclusive attractive ui .footer should place at bottom and occupie 100% width (onclick login or createaccount scroll to top, follow the bg color pattern don't change it).dont change ui color and styles of login & create account page for desktop ui . and develop for mobile screens like top title below login box below info next footer foloow this order
+3.you forgot some buttons to apply style observe every button holds a style with amination add to these items .restrict, suspend while enter reason in admin logs , restore access button . apply button styles for this also.
 4.never send icon while send email .
-5.in my impact page in click toggle buttons scroll to desired graph is not occuring.
+5.in my impact page graph is not visible clearly make it visible clearly (x axis ) with good ui.
 
 
 
@@ -328,35 +326,18 @@ few more requriments:
 1.for ngo in opportunites deatils make sure edit button and delete button appear side by side for desktop screens.
 2.for admin in opportunites deatils make sure suspend ngo  button and restrict ngo button appear side by side for desktop screens.
 3.for admin for small screens the window opens on suspend ngo and restrict ngo in opportiunity details conatiner is not scrollable,make it scrollable and make sure that window ui is compactable for small screen.
-4.add a cross button to winodow appears on click user first letter icon and notificationpanel window to close the window.and notification header, and no notification is not good in notificationpanel style if 
+4.add a cross button to winodow appears on click user first letter icon and notificationpanel window to close the window.and notification header, and no notification is not good in notificationpanel.
 5.for small screens bottom navbar height is large reduce it and selected navlink is highlight with square box .make it circle with no extra outer highlight one layer is enough.
 6.for volunteeer & ngos on type search bar in topbar.jsx a window is appears. implement that window for small screens(don't break for desktop ui).
 7. in opportuintes page filter selection input also not appearing correctly in small screen delevelop for small screen.
-8.redesign create opportiunity form using our new button style (mkae sure button width minimum with text and icon visible)with same inputs , logic, functionality it have.
 9.develop small screen ui for map picker(make sure one exit button in map picker).
 10.i want register.jsx ui same don't change any thing(follow the bg color and pattern don't change it for desktop for mobile screen follow this order  title with icon  login & create account window below this  move the content info we have ). with that add below information to get a overview(introducing opportuintes, pickup flows , co2 saving .don't design same as help & support page use that data and redesign ui here like with a attractive ui for light & darkmode,dektop & mobile screens) of app.
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 small ui requirements:
-1.for desktop homelayout is scrolling .i want side navbar , main container scrollable seperately .avoid both scrolling at a time (homeloyout.jsx). 
-2.for small screens bottom navbar ui should be touch to bottom screen (with not border radius).and remove name of page below icon for  .just place icon that's enough.
+1.for desktop screen navbar select link highlighting ui and transistion from one link to another ui is not good redesign that transistion is and highlighting part with good professionl smooth ui transistion.
+2.for mobile screen in bottom navlink on select link make icon size bigger .indicating that page is viewing now.
 3.for small screens the winodow appears on click user first letter icon and notificationpanel window in topbar.id not appearing correctly some potion of the window is out of screen.don't break ui for desktop.and make ui appear correctly in small screens.
 4.in typing indicator that bubbles have to appear in white color for darkmode and blace in lightmode.
 5.in small screen in click quick links topbar scroll upwards where stays normal on user scroll .i want topbar fixed in any situation (avoid ui strucking).
@@ -369,9 +350,6 @@ small ui requirements:
 
 1.in opportunites details container back to opportunity button looks bad (wider) reduce its width.
 and edit ,delete , view location button have to use our new animation button styles and edit ,delete , view location, restrict NGO,suspend ngo these all button use min width with full text icon visible in one line (not wraped).
-
- 2. add padding bottom 100px to all pages .
-
-
-when delete account occurs not only delete user object. delete all pickups created by this user , appliaction created by this user if user is volunteeer.
+2. add padding bottom 100px to all pages .
+3.when delete account occurs not only delete user object. delete all pickups created by this user , appliaction created by this user if user is volunteeer.
 delete all opportunites created by this user.if user is NGO.

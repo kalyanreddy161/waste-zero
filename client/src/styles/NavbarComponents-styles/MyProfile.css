@@ -689,13 +689,15 @@ html.dark .switch {
   overflow: visible;
   z-index: 1200;
   opacity: 0;
-  transform: translateX(-50%) translateY(-24px);
+  transform: translateX(calc(-50% + var(--swipe-x, 0px))) translateY(-24px);
   left: 50%;
   top: 18px;
   position: fixed;
   min-width: 340px;
   max-width: calc(100% - 48px);
   padding: 0;
+  touch-action: pan-y;
+  transition: transform 140ms ease, opacity 140ms ease;
 }
 
 .messagebox.show {
@@ -705,6 +707,18 @@ html.dark .switch {
 
 .messagebox.closing {
   animation: closePop 420ms cubic-bezier(.2, .9, .2, 1) forwards;
+}
+
+.messagebox.swiping {
+  transition: none;
+}
+
+.messagebox.swiped-left {
+  animation: swipeOutLeft 200ms ease forwards;
+}
+
+.messagebox.swiped-right {
+  animation: swipeOutRight 200ms ease forwards;
 }
 
 @keyframes dropIn {
@@ -717,6 +731,16 @@ html.dark .switch {
   20% { transform: translateX(-50%) translateY(-10px); }
   50% { transform: translateX(-50%) translateY(6px); }
   100% { transform: translateX(-50%) translateY(-140%); opacity: 1; }
+}
+
+@keyframes swipeOutLeft {
+  0% { transform: translateX(calc(-50% + var(--swipe-x, 0px))) translateY(0); opacity: 1; }
+  100% { transform: translateX(-140%) translateY(0); opacity: 0; }
+}
+
+@keyframes swipeOutRight {
+  0% { transform: translateX(calc(-50% + var(--swipe-x, 0px))) translateY(0); opacity: 1; }
+  100% { transform: translateX(40%) translateY(0); opacity: 0; }
 }
 
 .messagebox-inner {

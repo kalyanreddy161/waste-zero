@@ -397,8 +397,26 @@ export default function AdminPanel() {
     );
   }
 
+  const logsRef = React.useRef(null);
+  const usersRef = React.useRef(null);
+
+  useEffect(() => {
+    const handler = (ev) => {
+      const detail = ev?.detail || {};
+      if (detail.page !== "admin" || !detail.key) return;
+      if (detail.key === "logs" && logsRef.current) {
+        logsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      if (detail.key === "users" && usersRef.current) {
+        usersRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    window.addEventListener("mobile:custom-link", handler);
+    return () => window.removeEventListener("mobile:custom-link", handler);
+  }, []);
+
   return (
-    <div className="page admin-logs-page">
+    <div className="page admin-logs-page" ref={logsRef}>
       <div className="page-header-wrapper">
         <h1 className="page-header">Admin Logs</h1>
         <p className="page-subtitle">
@@ -442,7 +460,7 @@ export default function AdminPanel() {
           </div>
 
           <div className="admin-layout-grid">
-            <section className="admin-section admin-users-section">
+            <section className="admin-section admin-users-section" ref={usersRef}>
               <div className="admin-section-head admin-section-head-row">
                 <div>
                   <h2>User behavior review</h2>
@@ -577,14 +595,17 @@ export default function AdminPanel() {
                             </ActionButton>
                           )}
                           {moderationStatus !== "active" && (
-                            <button
+                            <ActionButton
                               type="button"
-                              className="admin-action-btn restore"
+                              icon="restore"
+                              tone="primary"
+                              size="sm"
+                              minWidth={180}
                               onClick={() => handleRestore(user)}
                               disabled={isSubmitting}
                             >
                               {isSubmitting ? "Updating..." : "Restore Access"}
-                            </button>
+                            </ActionButton>
                           )}
                         </div>
 
@@ -662,13 +683,12 @@ export default function AdminPanel() {
                             </div>
 
                             <div className="admin-moderation-actions">
-                              <button
+                              <ActionButton
                                 type="button"
-                                className={`admin-action-btn ${
-                                  actionState.mode === "suspend"
-                                    ? "danger"
-                                    : "confirm"
-                                }`}
+                                icon={actionState.mode === "restrict" ? "restrict" : "suspend"}
+                                tone={actionState.mode === "restrict" ? "warning" : "danger"}
+                                size="sm"
+                                minWidth={180}
                                 onClick={() =>
                                   handleModerationAction(user, actionState.mode)
                                 }
@@ -679,15 +699,18 @@ export default function AdminPanel() {
                                   : actionState.mode === "restrict"
                                     ? "Restrict User"
                                     : "Suspend User"}
-                              </button>
-                              <button
+                              </ActionButton>
+                              <ActionButton
                                 type="button"
-                                className="admin-action-btn secondary"
+                                icon="back"
+                                tone="neutral"
+                                size="sm"
+                                minWidth={160}
                                 onClick={() => closeActionEditor(userId)}
                                 disabled={isSubmitting}
                               >
                                 Cancel
-                              </button>
+                              </ActionButton>
                             </div>
                           </div>
                         )}

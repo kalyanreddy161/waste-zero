@@ -47,13 +47,6 @@ const MobileNavBar = () => {
   return (
     <nav className="mobile-nav">
       <div className="mobile-nav-inner">
-        <div
-          className="mobile-nav-indicator"
-          style={{
-            width: `${100 / items.length}%`,
-            transform: `translateX(${Math.max(activeIndex, 0) * 100}%)`,
-          }}
-        />
         {items.map((item, index) => {
           const active = activeIndex === index;
           return (

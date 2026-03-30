@@ -27,6 +27,9 @@
     padding: 20px 18px 14px;
     border-bottom: 1px solid #f0f0f0;
     background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 5;
 }
 
 .msg-panel-header h2 {
@@ -347,7 +350,7 @@
     background: #fff;
     border-bottom: 1px solid #eee;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    z-index: 5;
+    z-index: 8;
     flex-shrink: 0;
     position: sticky;
     top: 0;
@@ -1088,7 +1091,7 @@
     flex: 1;
     display: flex;
     align-items: center;
-    background: #f4faf8;
+    background: transparent;
     border: 1.5px solid #d8ede7;
     border-radius: 24px;
     padding: 8px 16px;
@@ -1462,10 +1465,11 @@ html.dark .msg-image-modal-image {
 @media (max-width: 768px) {
     .msg-page {
         flex-direction: column;
-        height: auto;
-        min-height: calc(100vh - var(--mobile-nav-height) - 70px);
+        height: calc(100vh - var(--mobile-nav-height));
+        min-height: calc(100vh - var(--mobile-nav-height));
         background: var(--page-bg);
         padding-bottom: 0;
+        overflow: hidden;
     }
 
     .msg-left-panel,
@@ -1477,17 +1481,28 @@ html.dark .msg-image-modal-image {
     .msg-left-panel {
         border-right: none;
         min-height: 320px;
+        flex: 1;
+        height: calc(100vh - var(--mobile-nav-height));
+        display: flex;
+        flex-direction: column;
     }
 
     .msg-right-panel {
         flex: 1;
-        min-height: 320px;
-        overflow: visible;
-        padding-bottom: var(--mobile-nav-height);
+        min-height: calc(100vh - var(--mobile-nav-height));
+        height: calc(100vh - var(--mobile-nav-height));
+        overflow: hidden;
+        padding-bottom: 0;
+        position: relative;
     }
 
     .msg-conv-header {
         gap: 12px;
+        position: fixed;
+        top: var(--topbar-height);
+        left: 0;
+        right: 0;
+        z-index: 14;
     }
 
     .msg-mobile-back {
@@ -1495,14 +1510,43 @@ html.dark .msg-image-modal-image {
     }
 
     .msg-messages-area {
-        padding-bottom: 12px;
+        flex: none;
+        height: calc(100vh - var(--topbar-height) - var(--mobile-nav-height) - var(--msg-input-height));
+        overflow-y: auto;
+        padding-top: calc(var(--msg-header-height) + 12px);
+        padding-bottom: calc(var(--msg-input-height) + 12px);
     }
 
     .msg-input-bar {
-        position: sticky;
+        position: fixed;
         bottom: var(--mobile-nav-height);
-        border-radius: 18px 18px 0 0;
-        box-shadow: 0 -10px 26px rgba(15, 23, 42, 0.12);
+        left: 0;
+        right: 0;
+        border-radius: 0;
+        box-shadow: none;
         background: var(--surface-primary);
+        padding: 12px 14px;
+        border-top: 1px solid var(--border-color);
+        z-index: 14;
+    }
+
+    .msg-input-wrap {
+        border-radius: 18px;
+        background: var(--surface-secondary);
+        border-color: var(--border-color);
+        padding: 10px 12px;
+    }
+
+    .msg-send-btn {
+        width: 40px;
+        height: 40px;
+        box-shadow: none;
+    }
+
+    .msg-new-chat-btn {
+        position: fixed;
+        bottom: calc(var(--mobile-nav-height) + 12px);
+        right: 16px;
+        z-index: 140;
     }
 }

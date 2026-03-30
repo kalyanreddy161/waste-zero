@@ -268,10 +268,25 @@ export default function NotificationPanel() {
     }
   };
 
+  const closePanel = () => {
+    try {
+      window.dispatchEvent(new CustomEvent("notify:close-panel"));
+    } catch (e) { }
+  };
+
   return (
     <div className="notification-panel" style={{ padding: 12 }}>
-      {loading && <div>Loading...</div>}
-      {!loading && notifications.length === 0 && <div>No notifications</div>}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingBottom: 10, position: "sticky", top: 0, background: "var(--surface-primary)", zIndex: 2 }}>
+        
+      </div>
+
+      {loading && <div style={{ padding: 12, color: "var(--text-secondary)" }}>Loading...</div>}
+      {!loading && notifications.length === 0 && (
+        <div style={{ padding: 16, textAlign: "center", color: "var(--text-secondary)", display: "grid", gap: 6 }}>
+          <span style={{ fontWeight: 700 }}>You're all caught up</span>
+          <small>No new notifications right now.</small>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {notifications.map((n) => (

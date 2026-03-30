@@ -1,18 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import Navbar from "./Navbar";
 import Topbar from "../components/Topbar";
 import MobileNavBar from "../components/MobileNavBar";
 import MobileDrawer from "../components/MobileDrawer";
-import { useMe } from "../Services/useMe";
+import { API_BASE, useMe } from "../Services/useMe";
 import useIsMobile from "../Services/useIsMobile";
+import { useLoading } from "../Services/LoadingContext";
+import socket from "../services/socket";
+import pushService from "../Services/pushService";
 import impactIcon from "../assets/icons/impact.svg";
 import settingsIcon from "../assets/icons/settings.svg";
 import helpIcon from "../assets/icons/help.svg";
 import profileIcon from "../assets/icons/profile.svg";
+import logoutIcon from "../assets/icons/logout.svg";
 
 export default function HomeLayout() {
   const { data: me } = useMe();
+  const queryClient = useQueryClient();
+  const { setLoading } = useLoading();
   const isMobile = useIsMobile();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -41,9 +48,33 @@ export default function HomeLayout() {
       { label: "Settings", to: "/home/settings", icon: settingsIcon },
       { label: "Help & Support", to: "/home/help", icon: helpIcon },
     ];
-    if (isAdmin) return extras;
-    return [{ label: "My Impact", to: "/home/impact", icon: impactIcon }, ...extras];
+    const logoutItem = { label: "Logout", action: "logout", icon: logoutIcon };
+    if (isAdmin) return [...extras, logoutItem];
+    return [{ label: "My Impact", to: "/home/impact", icon: impactIcon }, ...extras, logoutItem];
   }, [me]);
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      try { await pushService.unsubscribePush(); } catch (err) { }
+      try { socket.disconnect(); } catch (err) { }
+      queryClient.clear();
+      try {
+        sessionStorage.setItem(
+          "global_message",
+          JSON.stringify({ message: "Logout successful", type: "success" })
+        );
+      } catch (err) { }
+    } finally {
+      setLoading(false);
+      setDrawerOpen(false);
+      window.location.replace("/");
+    }
+  };
 
   const customConfig = useMemo(() => {
     const path = location.pathname;
@@ -93,7 +124,13 @@ export default function HomeLayout() {
       return { pageKey: "", links: [], active: "", currentLabel: "Schedule & Pickup" };
     }
     if (path.startsWith("/home/admin")) {
-      return { pageKey: "", links: [], active: "", currentLabel: "Admin Logs" };
+      const pageKey = "admin";
+      const links = [
+        { key: "logs", label: "Admin Logs" },
+        { key: "users", label: "Users Overview" },
+      ];
+      const active = customState[pageKey] || "logs";
+      return { pageKey, links, active, currentLabel: "Admin Logs" };
     }
     if (path.startsWith("/home/settings")) {
       return { pageKey: "", links: [], active: "", currentLabel: "Settings" };
@@ -137,6 +174,7 @@ export default function HomeLayout() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         me={me}
+        onLogout={handleLogout}
         currentPageLabel={customConfig.currentLabel}
         customLinks={customConfig.links}
         customPageKey={customConfig.pageKey}

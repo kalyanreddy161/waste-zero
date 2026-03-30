@@ -79,6 +79,17 @@ const MapPicker = ({ open, initial, onCancel, onChoose, readOnly, embedded }) =>
   const [searchText, setSearchText] = useState("");
   const [selected, setSelected] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSmallScreen, setIsSmallScreen] = useState(
+    () => (typeof window !== "undefined" ? window.innerWidth <= 640 : false)
+  );
+
+  useEffect(() => {
+    const onResize = () => {
+      setIsSmallScreen(typeof window !== "undefined" ? window.innerWidth <= 640 : false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const reverseLookup = async (lat, lng) => {
     try {
@@ -314,16 +325,43 @@ const MapPicker = ({ open, initial, onCancel, onChoose, readOnly, embedded }) =>
     );
   }
 
+  const overlayDynamicStyle = {
+    ...overlayStyle,
+    alignItems: isSmallScreen ? "flex-start" : overlayStyle.alignItems,
+    padding: isSmallScreen ? "10px 10px calc(var(--mobile-nav-height) + 10px)" : "0",
+  };
+
+  const modalDynamicStyle = {
+    ...modalStyle,
+    width: isSmallScreen ? "100vw" : modalStyle.width,
+    height: isSmallScreen ? "calc(100vh - var(--topbar-height) - 6px)" : modalStyle.height,
+    borderRadius: isSmallScreen ? 0 : modalStyle.borderRadius,
+  };
+
+  const controlsDynamicStyle = isSmallScreen
+    ? {
+        ...controlsStyle,
+        position: "static",
+        width: "100%",
+        boxShadow: "none",
+        margin: "0 0 8px 0",
+        border: "1px solid var(--border-color)",
+      }
+    : controlsStyle;
+
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        <div style={headerStyle}>
+    <div style={overlayDynamicStyle}>
+      <div style={modalDynamicStyle}>
+        <div style={{ ...headerStyle, justifyContent: "space-between" }}>
           <ActionButton type="button" icon="back" tone="neutral" size="sm" minWidth={132} onClick={onCancel}>
             Back
           </ActionButton>
           <div style={{ flex: 1, textAlign: "center", fontWeight: 600, fontSize: "18px" }}>
             {readOnly ? "View Location" : "Select Location"}
           </div>
+          <ActionButton type="button" icon="close" tone="neutral" size="sm" minWidth={110} onClick={onCancel}>
+            Close
+          </ActionButton>
         </div>
 
         <div style={mapContainerStyle}>
@@ -344,14 +382,14 @@ const MapPicker = ({ open, initial, onCancel, onChoose, readOnly, embedded }) =>
           )}
 
           {!readOnly && (
-            <div style={controlsStyle}>
+            <div style={controlsDynamicStyle}>
               <input
                 placeholder="Search location"
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
                 style={{
                   padding: "6px 8px",
-                  minWidth: 260,
+                  minWidth: isSmallScreen ? "100%" : 260,
                   background: "var(--surface-primary)",
                   color: "var(--text-primary)",
                   border: "1px solid var(--border-color)",
@@ -370,7 +408,7 @@ const MapPicker = ({ open, initial, onCancel, onChoose, readOnly, embedded }) =>
           <div ref={mapRef} id="mappicker-map" style={{ width: "100%", height: "100%" }} />
 
           {!readOnly && (
-            <div style={proceedBarStyle}>
+            <div style={{ ...proceedBarStyle, position: isSmallScreen ? "static" : "absolute" }}>
               <div style={{ color: "var(--text-secondary)" }}>
                 {selected
                   ? (selected.city

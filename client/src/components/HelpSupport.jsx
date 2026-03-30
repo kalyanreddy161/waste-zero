@@ -365,7 +365,7 @@ const HelpSupport = () => {
           </p>
           <ActionButton
             type="button"
-            icon="mail"
+            icon={null}
             tone="primary"
             minWidth={176}
             onClick={() => window.open(`mailto:${SUPPORT_EMAIL}`, "_self")}
@@ -539,7 +539,7 @@ const HelpSupport = () => {
                 <span>{String(feedback.length || 0)}/2000</span>
                 <ActionButton
                   type="button"
-                  icon="mail"
+                  icon="check"
                   tone="primary"
                   minWidth={188}
                   onClick={handleFeedbackSubmit}

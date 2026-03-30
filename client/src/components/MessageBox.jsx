@@ -30,8 +30,21 @@ const MessageBox = ({ message, type = "info", closing = false }) => {
       : type === "error"
         ? "var(--danger)"
         : "var(--text-primary)";
-  const ref = useRef(null);
   const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [swipeX, setSwipeX] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const [swipeExit, setSwipeExit] = useState("");
+  const startRef = useRef({ x: 0, y: 0 });
+  const isMobile = typeof window !== "undefined" ? window.innerWidth <= 900 : false;
+
+  // reset on new message
+  useEffect(() => {
+    setDismissed(false);
+    setSwiping(false);
+    setSwipeX(0);
+    setSwipeExit("");
+  }, [message, type]);
 
   useEffect(() => {
     // entrance animation: appear from top a tick after mount
@@ -41,6 +54,7 @@ const MessageBox = ({ message, type = "info", closing = false }) => {
 
   const style = { borderColor: color };
   const isVisible = visible || closing;
+  if (dismissed) return null;
 
   // message can be a simple string or an object: { title, content, icon }
   const isObj = message && typeof message === 'object';
@@ -51,12 +65,47 @@ const MessageBox = ({ message, type = "info", closing = false }) => {
   const DURATION = 3500; // ms — matches Topbar timeout
   const progressColor = type === 'error' ? 'var(--danger)' : 'var(--primary)';
 
+  const handleTouchStart = (e) => {
+    if (!isMobile) return;
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    startRef.current = { x: t.clientX, y: t.clientY };
+    setSwiping(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isMobile || !swiping) return;
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    const deltaX = t.clientX - startRef.current.x;
+    setSwipeX(deltaX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!isMobile || !swiping) return;
+    const absX = Math.abs(swipeX);
+    if (absX > 64) {
+      const dir = swipeX > 0 ? "right" : "left";
+      setSwipeExit(dir);
+      window.setTimeout(() => {
+        setDismissed(true);
+        try { window.dispatchEvent(new CustomEvent("messagebox:dismiss")); } catch (e) { }
+      }, 180);
+    } else {
+      setSwipeX(0);
+      setSwiping(false);
+    }
+  };
+
   return (
     <div
-      ref={ref}
-      className={`messagebox ${isVisible ? 'show' : ''} ${closing ? 'closing' : ''}`}
-      style={style}
+      className={`messagebox ${isVisible ? 'show' : ''} ${closing ? 'closing' : ''} ${swiping ? 'swiping' : ''} ${swipeExit ? `swiped-${swipeExit}` : ''}`}
+      style={{ ...style, "--swipe-x": `${swipeX}px` }}
       aria-live="polite"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
       <div className="messagebox-inner" style={{ background: "var(--surface-primary)", color }}>
         <div className="messagebox-content">

@@ -66,6 +66,7 @@
   box-shadow: var(--shadow-medium);
   border: 1px solid var(--border-color);
   margin-bottom: 40px;
+  overflow: hidden;
 }
 
 .chart-header {
@@ -147,4 +148,51 @@
 .recharts-wrapper,
 .recharts-surface {
   outline: none !important;
+  overflow: visible;
+}
+
+.recharts-cartesian-axis-tick-value {
+  fill: var(--chart-text);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .impact-page {
+    padding: 18px 14px 112px;
+  }
+
+  .impact-header {
+    padding: 12px 14px;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .chart-section {
+    padding: 20px 16px 18px;
+    margin-bottom: 24px;
+    border-radius: 18px;
+  }
+
+  .chart-header {
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .chart-title {
+    font-size: 22px;
+  }
+
+  .chart-subtitle {
+    font-size: 13px;
+  }
+
+  .select-month {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .recharts-responsive-container {
+    min-height: 320px;
+  }
 }

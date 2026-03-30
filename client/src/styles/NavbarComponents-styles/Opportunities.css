@@ -66,6 +66,7 @@ main.opp-hide-main-scroll {
     align-items: center;
     margin-bottom: 30px;
     gap: 20px;
+    flex-wrap: wrap;
 }
 
 .opps-title-block {
@@ -92,6 +93,7 @@ main.opp-hide-main-scroll {
     position: relative;
     display: inline-block;
     font-family: inherit;
+    margin-right: 12px;
 }
 
 .opps-composite-filter .composite-label {
@@ -102,6 +104,16 @@ main.opp-hide-main-scroll {
     font-weight: 700;
     color: var(--text-main);
     cursor: default;
+}
+
+@media (max-width: 768px) {
+    .opps-composite-filter {
+        width: 100%;
+    }
+    .opps-composite-filter .composite-label {
+        width: 100%;
+        justify-content: space-between;
+    }
 }
 
 
@@ -121,15 +133,39 @@ main.opp-hide-main-scroll {
     min-width: 260px;
     max-width: min(360px, calc(100vw - 20px));
 
-    background: transparent;
+    background: var(--surface-primary);
     border-radius: 12px;
-    padding: 8px;
+    padding: 48px 12px 12px 12px;
     z-index: 60;
 
     grid-template-columns: 1fr;
     box-sizing: border-box;
 
     overflow: auto;
+}
+
+.composite-close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    z-index: 2;
+}
+
+@media (max-width: 820px) {
+    .composite-close {
+        position: sticky;
+        top: 8px;
+        margin-left: auto;
+    }
 }
 
 /* Small screens: make menu full-width (with small side padding) and stack groups */
@@ -144,6 +180,35 @@ main.opp-hide-main-scroll {
         max-height: calc(100vh - 140px);
         overflow-y: auto;
         top: calc(100% + 10px);
+    }
+}
+
+/* Improve mobile visibility of filter flyout */
+@media (max-width: 820px) {
+    .opps-composite-filter {
+        position: static;
+        width: 100%;
+        margin-right: 0;
+    }
+
+    .opps-composite-filter .composite-label {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .opps-composite-filter .composite-menu {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: calc(var(--topbar-height) + 52px);
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        transform: none;
+        z-index: 2000;
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+        max-height: calc(100vh - var(--topbar-height) - var(--mobile-nav-height) - 24px);
+        background: var(--surface-primary);
     }
 }
 
@@ -202,18 +267,27 @@ main.opp-hide-main-scroll {
 /* composite-btn: match size and visual weight of create button */
 .composite-btn {
     padding: 12px 24px;
-    margin: 20px;
-    border-radius: 8px;
-    font-weight: 600;
+    margin: 0;
+    border-radius: 12px;
+    font-weight: 700;
     background: #ffffff;
     border: 1px solid #E5E7EB;
     color: var(--text-main);
     cursor: pointer;
-    box-shadow: 0 4px 8px rgba(2, 6, 23, 0.04);
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.06);
+    transition: transform 140ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
 .composite-btn:hover {
     background: rgba(8, 193, 138, 0.04);
+    border-color: rgba(8, 193, 138, 0.25);
+    box-shadow: 0 14px 28px rgba(2, 6, 23, 0.08);
+    transform: translateY(-1px);
+}
+
+.composite-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 14px rgba(2, 6, 23, 0.08);
 }
 
 
@@ -762,7 +836,8 @@ main.opp-hide-main-scroll {
 
 .opps-details-actions {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 12px;
     align-items: flex-start;
 }
@@ -1109,7 +1184,8 @@ button.details-edit-btn:hover,
 }
 
 .opps-details-actions .action-button {
-    align-self: flex-start;
+    align-self: stretch;
+    flex: 1 1 180px;
 }
 
 .opps-view-location-row {
@@ -1126,7 +1202,22 @@ button.details-edit-btn:hover,
 }
 
 .opps-admin-moderation-actions {
-    align-items: flex-start;
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+.opps-admin-moderation-actions .action-button {
+    flex: 1 1 180px;
+    align-self: stretch;
+}
+
+@media (min-width: 1024px) {
+    .opps-details-actions,
+    .opps-admin-moderation-actions {
+        flex-wrap: nowrap;
+    }
 }
 
 /* Modal Overlay */
@@ -1745,6 +1836,48 @@ button.details-edit-btn:hover,
     }
 }
 
+@media (max-width: 640px) {
+    .opps-report-overlay {
+        align-items: flex-start;
+        justify-content: center;
+        padding: 12px 10px calc(var(--mobile-nav-height) + 12px);
+        overflow-y: auto;
+    }
+
+    .opps-report-modal {
+        width: 100%;
+        max-height: calc(100vh - var(--topbar-height) - var(--mobile-nav-height) + 10px);
+        border-radius: 16px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .opps-report-header {
+        position: sticky;
+        top: 0;
+        background: var(--surface-primary);
+        z-index: 3;
+        padding: 18px 18px 12px;
+    }
+
+    .opps-report-body {
+        padding: 18px 18px 10px;
+    }
+
+    .opps-report-actions {
+        padding: 12px 18px 18px;
+        position: sticky;
+        bottom: 0;
+        background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.98));
+        z-index: 3;
+        flex-direction: column;
+    }
+
+    .opps-report-actions .button {
+        width: 100%;
+    }
+}
+
 @media (max-width: 600px) {
     .opps-details-footer-btns {
         flex-direction: column;
@@ -1771,6 +1904,11 @@ button.details-edit-btn:hover,
     .opps-details-actions,
     .opps-admin-moderation-actions {
         grid-template-columns: 1fr;
+    }
+
+    .opps-details-actions,
+    .opps-admin-moderation-actions {
+        flex-direction: column;
     }
 
     .opps-details-actions .action-button,

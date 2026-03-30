@@ -66,6 +66,13 @@ export function ActionGlyph({ icon = "arrow-right", className = "" }) {
           <path d="M4 12h16" />
         </svg>
       );
+    case "restore":
+      return (
+        <svg {...sharedProps}>
+          <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+          <path d="M20 4v6h-6" />
+        </svg>
+      );
     case "eye":
       return (
         <svg {...sharedProps}>
@@ -240,7 +247,8 @@ export default function ActionButton({
   style,
   ...props
 }) {
-  const iconNode = React.isValidElement(icon) ? icon : <ActionGlyph icon={icon} />;
+  const hasIcon = icon !== null && icon !== false;
+  const iconNode = !hasIcon ? null : React.isValidElement(icon) ? icon : <ActionGlyph icon={icon} />;
 
   const mergedStyle = {
     ...(minWidth ? { "--action-button-min-width": typeof minWidth === "number" ? `${minWidth}px` : minWidth } : {}),
@@ -252,6 +260,7 @@ export default function ActionButton({
     "action-button",
     `action-button--${tone}`,
     `action-button--${size}`,
+    !hasIcon ? "action-button--no-icon" : "",
     fullWidth ? "action-button--block" : "",
     className,
   ]
@@ -261,7 +270,7 @@ export default function ActionButton({
   return (
     <button {...props} type={type} className={classNames} style={mergedStyle}>
       <span className="action-button__text">{children}</span>
-      <span className="action-button__icon">{iconNode}</span>
+      {hasIcon && <span className="action-button__icon">{iconNode}</span>}
     </button>
   );
 }

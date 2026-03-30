@@ -34,6 +34,7 @@ const Settings = () => {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
   const availableYears = getAvailableAdminYears();
   const isAdmin = me?.role === "admin";
   const hasYearChanges = draftYear !== savedYear;
@@ -144,6 +145,54 @@ const Settings = () => {
               aria-label="Toggle dark mode"
               checked={isDarkMode}
               onChange={handleThemeToggle}
+            />
+          </label>
+        </div>
+
+        <div className="settings-card">
+          <div>
+            <h3>Notifications</h3>
+            <p>Turn on browser notifications for new messages and updates.</p>
+          </div>
+          <label className="settings-toggle-row">
+            <span>Browser notifications</span>
+            <input
+              className="settings-theme-toggle"
+              type="checkbox"
+              role="switch"
+              aria-label="Toggle browser notifications"
+              checked={pushEnabled}
+              onChange={async (e) => {
+                const next = e.target.checked;
+                if (!next) {
+                  setPushEnabled(false);
+                  return;
+                }
+                if (typeof Notification === "undefined") {
+                  showMessage("Notifications are not supported on this browser.", "error");
+                  setPushEnabled(false);
+                  return;
+                }
+                try {
+                  const permission = await Notification.requestPermission();
+                  if (permission === "granted") {
+                    try {
+                      await pushService.subscribePush();
+                      setPushEnabled(true);
+                      showMessage("Notifications enabled", "success");
+                    } catch (err) {
+                      setPushEnabled(false);
+                      showMessage("Failed to enable notifications", "error");
+                    }
+                  } else {
+                    setPushEnabled(false);
+                    showMessage("Please allow notifications in your browser", "error");
+                  }
+                } catch (err) {
+                  setPushEnabled(false);
+                  showMessage("Notification permission request blocked", "error");
+                }
+              }}
             />
           </label>
         </div>
