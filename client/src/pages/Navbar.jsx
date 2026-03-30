@@ -9,7 +9,7 @@ import "../styles/Navbar.css";
 // ✅ Import SVG icons
 import dashboardIcon from "../assets/icons/dashboard.svg";
 import scheduleIcon from "../assets/icons/schedule.svg";
-import opportunitiesIcon from "../assets/icons/opportunities.svg";
+import opportunitiesIcon from "../assets/icons/Opportunites.svg";
 import messagesIcon from "../assets/icons/messages.svg";
 import reportsIcon from "../assets/icons/Reports.svg";
 import impactIcon from "../assets/icons/impact.svg";
