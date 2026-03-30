@@ -60,6 +60,7 @@ store.on("error", (error) => {
 /* ======================
    SESSION MIDDLEWARE
 ====================== */
+app.set("trust proxy", 1); 
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "secret123",
   resave: false,
@@ -67,8 +68,8 @@ const sessionMiddleware = session({
   store: store,
   cookie: {
     httpOnly: true,
-    secure: false,
-    sameSite: "lax",
+    secure: true,
+    sameSite: "none",
     maxAge: process.env.SESSION_MAX_AGE
       ? parseInt(process.env.SESSION_MAX_AGE, 10)
       : 7 * 24 * 60 * 60 * 1000,

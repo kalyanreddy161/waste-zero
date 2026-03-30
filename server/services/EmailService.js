@@ -1,32 +1,51 @@
-const path = require("path");
+const dns = require("dns");
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "wastezeroofficial@gmail.com",
-    pass: "vgzk ugdr wbms bzdn",
-  },
-});
+// Prefer IPv4 on platforms where IPv6 networking is blocked (Render/Gmail)
+dns.setDefaultResultOrder("ipv4first");
 
-const RECYCLE_ICON_CID = "wastezero-recycle-icon";
-const RECYCLE_ICON_PATH = path.join(
-  __dirname,
-  "..",
-  "..",
-  "client",
-  "public",
-  "recycle_icon.svg"
-);
+const {
+  EMAIL_FROM,
+  EMAIL_USER,
+  EMAIL_APP_PASSWORD,
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  NODE_ENV,
+} = process.env;
 
-const BRAND_ATTACHMENTS = [
-  {
-    filename: "recycle_icon.svg",
-    path: RECYCLE_ICON_PATH,
-    cid: RECYCLE_ICON_CID,
-    contentType: "image/svg+xml",
-  },
-];
+const MAIL_FROM = EMAIL_FROM || EMAIL_USER || "no-reply@wastezero.app";
+const HOST = SMTP_HOST || "smtp.gmail.com";
+const PORT = Number(SMTP_PORT) || 465;
+const SECURE = typeof SMTP_SECURE === "string"
+  ? SMTP_SECURE.toLowerCase() !== "false"
+  : true;
+
+const canSendEmail = Boolean(EMAIL_USER && EMAIL_APP_PASSWORD);
+
+const transporter = canSendEmail
+  ? nodemailer.createTransport({
+      host: HOST,
+      port: PORT,
+      secure: SECURE,
+      auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_APP_PASSWORD, // Gmail App Password
+      },
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 50,
+      connectionTimeout: 10_000, // fail fast on Render
+      socketTimeout: 10_000,
+      greetingTimeout: 7_000,
+      family: 4, // force IPv4 sockets
+      tls: { minVersion: "TLSv1.2" },
+    })
+  : null;
+
+if (!canSendEmail) {
+  console.warn("[email] EMAIL_USER or EMAIL_APP_PASSWORD missing. Emails will be skipped.");
+}
 
 const escapeHtml = (value) =>
   String(value || "")
@@ -39,12 +58,9 @@ const escapeHtml = (value) =>
 const buildEmailShell = ({ title, contentHtml, footerText }) => `
   <div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
     <div style="max-width: 560px; margin: auto; background-color: #ffffff; padding: 24px; border-radius: 12px;">
-      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
-        <img src="cid:${RECYCLE_ICON_CID}" alt="WasteZero" width="32" height="32" style="display: block;" />
-        <div>
-          <div style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800;">WasteZero</div>
-          <div style="margin-top: 2px; color: #334155; font-size: 14px; font-weight: 600;">${escapeHtml(title)}</div>
-        </div>
+      <div style="margin-bottom: 18px;">
+        <div style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800;">WasteZero</div>
+        <div style="margin-top: 6px; color: #334155; font-size: 14px; font-weight: 600;">${escapeHtml(title)}</div>
       </div>
       ${contentHtml}
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px;" />
@@ -53,11 +69,35 @@ const buildEmailShell = ({ title, contentHtml, footerText }) => `
   </div>
 `;
 
+const queueEmail = (mailOptions = {}) => {
+  if (!transporter) {
+    console.warn("[email] Transport not configured; skipping send.");
+    return { queued: false, reason: "missing_credentials" };
+  }
+
+  try {
+    const sendPromise = transporter.sendMail(mailOptions);
+    sendPromise
+      .then((info) => {
+        if (NODE_ENV !== "test") {
+          console.log(`[email] sent -> ${mailOptions.to} (${info.messageId || "message"})`);
+        }
+      })
+      .catch((err) => {
+        console.error(`[email] send failed -> ${mailOptions.to}:`, err);
+      });
+    return { queued: true };
+  } catch (err) {
+    console.error("[email] enqueue failed:", err);
+    return { queued: false, reason: "enqueue_error" };
+  }
+};
+
 async function sendVerificationEmail(userEmail) {
   const verificationCode = Math.floor(100000 + Math.random() * 900000);
 
-  await transporter.sendMail({
-    from: '"WasteZero" <wastezeroofficial@gmail.com>',
+  const mailOptions = {
+    from: `"WasteZero" <${MAIL_FROM}>`,
     to: userEmail,
     subject: "Your Verification Code",
     text: `Your verification code is ${verificationCode}`,
@@ -82,11 +122,10 @@ async function sendVerificationEmail(userEmail) {
       `,
       footerText: "If you did not request this, you can safely ignore this email.",
     }),
-    attachments: BRAND_ATTACHMENTS,
-  });
+  };
 
-  console.log(`Verification code ${verificationCode} sent to ${userEmail}`);
-  return verificationCode;
+  queueEmail(mailOptions);
+  return { otp: verificationCode };
 }
 
 function buildEmailHtml(title, text) {
@@ -110,13 +149,12 @@ function buildEmailHtml(title, text) {
 }
 
 async function sendPlainEmail({ to, subject, text }) {
-  await transporter.sendMail({
-    from: '"WasteZero" <wastezeroofficial@gmail.com>',
+  queueEmail({
+    from: `"WasteZero" <${MAIL_FROM}>`,
     to,
     subject,
     text,
     html: buildEmailHtml(subject, text),
-    attachments: BRAND_ATTACHMENTS,
   });
 }
 
