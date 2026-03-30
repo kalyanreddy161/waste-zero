@@ -15,7 +15,7 @@ import Loading from "./components/Loading";
 import PageNotFound from "./components/PageNotFound";
 import { useLoading } from "./Services/LoadingContext";
 import { useEffect } from "react";
-import socket from "./services/socket";
+import socket from "./Services/socket.js";
 import {
   initializeTheme,
   syncThemeWithStorage,

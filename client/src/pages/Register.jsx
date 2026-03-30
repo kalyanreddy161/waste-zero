@@ -117,6 +117,10 @@ export default function Register() {
     username: "",
     password: ""
   });
+  const [loginFieldErrors, setLoginFieldErrors] = useState({
+    username: false,
+    password: false
+  });
 
   const [loginError, setLoginError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -140,7 +144,12 @@ export default function Register() {
   };
 
   const handleLoginChange = (e) => {
-    setLoginData({ ...loginData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setLoginData({ ...loginData, [name]: value });
+    setLoginError("");
+    if (loginFieldErrors[name]) {
+      setLoginFieldErrors((prev) => ({ ...prev, [name]: false }));
+    }
   };
 
   const resetForgotPasswordState = () => {
@@ -503,6 +512,18 @@ export default function Register() {
     e.preventDefault();
     setLoginError("");
 
+    const missingUsername = !loginData.username.trim();
+    const missingPassword = !loginData.password;
+
+    if (missingUsername || missingPassword) {
+      setLoginFieldErrors({
+        username: missingUsername,
+        password: missingPassword
+      });
+      setLoginError("Please enter your username and password.");
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await fetch(`${API}/login`, {
@@ -607,7 +628,7 @@ export default function Register() {
 
                   {!showForgotPassword ? (
                     <>
-                      <div className="input-container">
+                      <div className={`input-container ${loginFieldErrors.username ? "input-error" : ""}`}>
                         <input
                           type="text"
                           name="username"
@@ -619,7 +640,7 @@ export default function Register() {
                         <span className="input-highlight"></span>
                       </div>
 
-                      <div className="input-container">
+                      <div className={`input-container ${loginFieldErrors.password ? "input-error" : ""}`}>
                         <input
                           type="password"
                           name="password"
@@ -1002,14 +1023,14 @@ export default function Register() {
             NGO opportunities, and recycling pickups.
           </p>
           <div className="register-footer__support">
-            <a className="register-footer__mail" href="mailto:support@wastezero.com">
-              support@wastezero.com
+            <a className="register-footer__mail" href="mailto:wastezeroofficial@gmail.com">
+              wastezeroofficial@gmail.com
             </a>
             <span>Built for volunteers, NGOs, and WasteZero admins</span>
           </div>
         </div>
         <div className="register-footer__actions">
-          <a className="register-footer__btn mail" href="mailto:support@wastezero.com">Email Support</a>
+          <a className="register-footer__btn mail" href="mailto:wastezeroofficial@gmail.com">Email Support</a>
           <button
             type="button"
             className="register-footer__btn ghost"

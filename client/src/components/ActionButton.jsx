@@ -238,6 +238,10 @@ export default function ActionButton({
   children,
   icon = "arrow-right",
   type = "button",
+  as,
+  href,
+  target,
+  rel,
   tone = "primary",
   size = "md",
   fullWidth = false,
@@ -245,6 +249,7 @@ export default function ActionButton({
   width,
   className = "",
   style,
+  disabled = false,
   ...props
 }) {
   const hasIcon = icon !== null && icon !== false;
@@ -267,10 +272,30 @@ export default function ActionButton({
     .filter(Boolean)
     .join(" ");
 
+  const isLink = as === "a" || Boolean(href);
+  const Component = as || (isLink ? "a" : "button");
+
+  const sharedProps = {
+    ...props,
+    className: classNames,
+    style: mergedStyle,
+  };
+
+  if (isLink) {
+    sharedProps.href = href;
+    if (target) sharedProps.target = target;
+    if (rel || target === "_blank") {
+      sharedProps.rel = rel || "noopener noreferrer";
+    }
+  } else {
+    sharedProps.type = type;
+    sharedProps.disabled = disabled;
+  }
+
   return (
-    <button {...props} type={type} className={classNames} style={mergedStyle}>
+    <Component {...sharedProps}>
       <span className="action-button__text">{children}</span>
       {hasIcon && <span className="action-button__icon">{iconNode}</span>}
-    </button>
+    </Component>
   );
 }

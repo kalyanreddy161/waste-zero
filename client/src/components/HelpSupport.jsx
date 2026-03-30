@@ -364,11 +364,11 @@ const HelpSupport = () => {
             Reach out for account help, pickup support, opportunity guidance, or general platform questions.
           </p>
           <ActionButton
-            type="button"
+            as="a"
+            href={`mailto:${SUPPORT_EMAIL}`}
             icon={null}
             tone="primary"
             minWidth={176}
-            onClick={() => window.open(`mailto:${SUPPORT_EMAIL}`, "_self")}
           >
             Email Support
           </ActionButton>

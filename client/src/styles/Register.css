@@ -85,7 +85,7 @@
 
 .register-overview {
   width: 100%;
-  padding: 0 32px 28px;
+  padding: 60px 30px 40px 30px;
   display: grid;
   grid-template-columns: minmax(360px, 1.15fr) minmax(0, 1.85fr);
   gap: 24px;
@@ -176,10 +176,10 @@
 }
 
 .register-overview__card h3 {
-  margin: 0;
+  margin-top: 20px;
   color: var(--text-primary);
   font-size: 19px;
-  line-height: 1.2;
+  line-height: 1;
 }
 
 /* CARD */
@@ -237,6 +237,9 @@
 
 /* ===== FLOATING INPUT ===== */
 .input-container { position: relative; margin-bottom: 18px; }
+.input-container.input-error .input-field { border-bottom-color: var(--danger, #e53935); }
+.input-container.input-error .input-label { color: var(--danger, #e53935); opacity: 1; transform: translateY(-18px); }
+.input-container.input-error .input-highlight { width: 100%; background: var(--danger, #e53935); }
 
 .input-field { width: 100%; padding: 12px 6px; font-size: 15px; border: none; border-bottom: 2px solid var(--border-color); outline: none; background: transparent; color: var(--text-primary); transition: border-color 0.18s ease; }
 .input-field::placeholder { color: var(--text-disabled); }
@@ -359,7 +362,7 @@
 
 .register-footer__mail {
   color: var(--primary);
-  font-weight: 700;
+  font-weight: 400;
   text-decoration: none;
   width: fit-content;
 }
@@ -381,7 +384,7 @@
   font-weight: 700;
   border: 1px solid rgba(15, 23, 42, 0.1);
   cursor: pointer;
-  background: var(--surface-primary);
+  background: linear-gradient(135deg, rgba(8, 193, 138, 0.1), rgba(8, 193, 138, 0.04));
   color: var(--text-primary);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
   text-decoration: none;
