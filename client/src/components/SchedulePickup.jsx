@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
 import { useMe, API_BASE } from "../Services/useMe";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import ConfirmDialog from "./ConfirmDialog";
 import CongratulationsDialog from "./CongratulationsDialog";
 import MessageBox from "./MessageBox";

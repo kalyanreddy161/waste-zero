@@ -9,7 +9,7 @@ import {
   removeNotificationFromCache,
   useNotifications,
 } from "../Services/useNotifications";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import pushService from "../Services/pushService";
 import NotificationPanel, {
   formatNotification,

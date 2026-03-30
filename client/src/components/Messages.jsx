@@ -21,7 +21,7 @@ import TypingLoader from './TypingLoader';
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import "../styles/NavbarComponents-styles/Messages.css";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import { useMe, API_BASE } from "../Services/useMe";
 import MessageBox from "./MessageBox";
 import useIsMobile from "../Services/useIsMobile";

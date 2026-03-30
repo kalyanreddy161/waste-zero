@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApplications } from "../Services/useApplications";
 import { useNavigate } from "react-router-dom";
 import { VolunteerApplicationModal } from "./NotificationPanel";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import AdminDashboard from "./AdminDashboard";
 import completeIcon from "../assets/icons/complete.svg";
 import pickupIcon from "../assets/icons/pickup.svg";

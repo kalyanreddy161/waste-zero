@@ -19,7 +19,7 @@ import {
   ADMIN_DASHBOARD_YEAR_EVENT,
   getStoredAdminDashboardYear,
 } from "../Services/adminDashboardYear";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import "../styles/NavbarComponents-styles/Dashboard.css";
 import completeIcon from "../assets/icons/complete.svg";
 import pickupIcon from "../assets/icons/pickup.svg";

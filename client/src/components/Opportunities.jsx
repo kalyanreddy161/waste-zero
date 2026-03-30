@@ -9,7 +9,7 @@ import MessageBox from "./MessageBox";
 import Loading from "./Loading";
 import MapPicker from "./MapPicker";
 import ActionButton from "./ActionButton";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import { VolunteerApplicationModal, ApplicationModal } from "./NotificationPanel";
 
 const formatRelativeTime = (iso) => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { API_BASE, useMe } from "../Services/useMe";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import MessageBox from "./MessageBox";
 import ActionButton from "./ActionButton";
 import "../styles/NavbarComponents-styles/AdminPanel.css";

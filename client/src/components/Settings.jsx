@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { API_BASE, useMe } from "../Services/useMe";
 import pushService from "../Services/pushService";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import MessageBox from "./MessageBox";
 import ActionButton from "./ActionButton";
 import {

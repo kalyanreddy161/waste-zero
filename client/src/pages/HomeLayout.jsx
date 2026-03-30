@@ -8,7 +8,7 @@ import MobileDrawer from "../components/MobileDrawer";
 import { API_BASE, useMe } from "../Services/useMe";
 import useIsMobile from "../Services/useIsMobile";
 import { useLoading } from "../Services/LoadingContext";
-import socket from "../services/socket";
+import socket from "../Services/socket";
 import pushService from "../Services/pushService";
 import impactIcon from "../assets/icons/impact.svg";
 import settingsIcon from "../assets/icons/settings.svg";
