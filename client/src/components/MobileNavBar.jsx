@@ -6,7 +6,7 @@ import "../styles/MobileNav.css";
 
 import dashboardIcon from "../assets/icons/dashboard.svg";
 import scheduleIcon from "../assets/icons/schedule.svg";
-import opportunitiesIcon from "../assets/icons/Opportunites.svg";
+import opportunitiesIcon from "../assets/icons/Opportunities.svg";
 import messagesIcon from "../assets/icons/messages.svg";
 import reportsIcon from "../assets/icons/Reports.svg";
 import profileIcon from "../assets/icons/profile.svg";
