@@ -105,6 +105,14 @@ const StyledWrapper = styled.div`
     right: 15%;
     animation-delay: 0.3s;
   }
+
+  html.dark & .typing-circle {
+    background-color: var(--primary);
+  }
+
+  html.dark & .typing-shadow {
+    background-color: rgba(8, 193, 138, 0.28);
+  }
 `;
 
 export default Loader;

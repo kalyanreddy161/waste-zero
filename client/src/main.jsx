@@ -20,7 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <LoadingProvider>
           <App />
         </LoadingProvider>
-        <ReactQueryDevtools initialIsOpen={true} />
+        {/* <ReactQueryDevtools initialIsOpen={true} /> */}
       </QueryClientProvider>
     </BrowserRouter>
   </React.StrictMode>

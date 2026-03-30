@@ -140,6 +140,10 @@ main.opp-hide-main-scroll {
         min-width: 0;
         width: calc(100% - 16px);
         grid-template-columns: 1fr;
+        transform: none;
+        max-height: calc(100vh - 140px);
+        overflow-y: auto;
+        top: calc(100% + 10px);
     }
 }
 
@@ -1904,6 +1908,50 @@ button.details-edit-btn:hover,
 
 html.dark .opportunities-page {
     color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    .opportunities-page {
+        padding: 16px 16px 96px;
+        max-height: none;
+        overflow-y: auto;
+    }
+
+    .opps-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .opps-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .opps-card {
+        max-width: 100%;
+    }
+
+    .opps-details-panel {
+        padding: 12px;
+        box-sizing: border-box;
+    }
+
+    .opps-details-hero {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .opps-details-layout,
+    .opps-details-layout-redesigned {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .opps-details-side,
+    .opps-details-main {
+        width: 100%;
+    }
 }
 
 html.dark .opps-title,

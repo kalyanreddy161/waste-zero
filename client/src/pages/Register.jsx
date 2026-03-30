@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MessageBox from "../components/MessageBox";
 import { useNavigate } from "react-router-dom";
 import "../styles/Register.css";
@@ -96,6 +96,8 @@ export default function Register() {
   /* ======================
      LOGIN STATE
   ====================== */
+  const authCardRef = useRef(null);
+
   const [loginData, setLoginData] = useState({
     username: "",
     password: ""
@@ -137,6 +139,19 @@ export default function Register() {
     setForgotOtpVerified(false);
     setForgotPasswordsMatch(true);
     setForgotError("");
+  };
+
+  const scrollToAuthSection = (targetMode) => {
+    setMode(targetMode);
+    setShowForgotPassword(false);
+    if (targetMode === "register") {
+      resetForgotPasswordState();
+    }
+    window.requestAnimationFrame(() => {
+      if (authCardRef.current) {
+        authCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
   };
 
   const handleForgotChange = (e) => {
@@ -545,7 +560,7 @@ export default function Register() {
         </div>
 
         <div className="register-right page-center">
-          <div className="auth-card">
+          <div className="auth-card" ref={authCardRef}>
 
             {/* Tabs */}
             <div className="tab-header">
@@ -935,6 +950,28 @@ export default function Register() {
       {notification.open && (
         <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
       )}
+      <footer className="register-footer">
+        <div className="register-footer__meta">
+          <span className="register-footer__brand">WasteZero</span>
+          <a className="register-footer__mail" href="mailto:support@wastezero.com">support@wastezero.com</a>
+        </div>
+        <div className="register-footer__actions">
+          <button
+            type="button"
+            className="register-footer__btn ghost"
+            onClick={() => scrollToAuthSection("login")}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            className="register-footer__btn primary"
+            onClick={() => scrollToAuthSection("register")}
+          >
+            Create Account
+          </button>
+        </div>
+      </footer>
     </>
   );
 }

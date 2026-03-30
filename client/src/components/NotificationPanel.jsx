@@ -270,10 +270,6 @@ export default function NotificationPanel() {
 
   return (
     <div className="notification-panel" style={{ padding: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Notifications</h4>
-      </div>
-
       {loading && <div>Loading...</div>}
       {!loading && notifications.length === 0 && <div>No notifications</div>}
 

@@ -24,6 +24,7 @@ import "../styles/NavbarComponents-styles/Messages.css";
 import socket from "../services/socket";
 import { useMe, API_BASE } from "../Services/useMe";
 import MessageBox from "./MessageBox";
+import useIsMobile from "../Services/useIsMobile";
 
 const API = `${API_BASE}/api/chat`;
 
@@ -546,8 +547,10 @@ const Messages = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const [activeConv, setActiveConv] = useState(null); // full conversation object
+  const [mobileView, setMobileView] = useState("split"); // list | chat | split (desktop)
   const [inputText, setInputText] = useState("");
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -563,15 +566,19 @@ const Messages = () => {
   const [imageModal, setImageModal] = useState({ open: false, url: "", fileName: "" });
   const [manualSeparators, setManualSeparators] = useState({}); // { convId: Set<dateStr> }
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [emojiTheme, setEmojiTheme] = useState(() =>
     document.documentElement.classList.contains("dark") ? EmojiTheme.DARK : EmojiTheme.LIGHT
   );
   const typingTimer = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiButtonRef = useRef(null);
+  const attachMenuRef = useRef(null);
+  const attachButtonRef = useRef(null);
   const preserveScrollRef = useRef({ active: false, prevScrollHeight: 0, prevScrollTop: 0 });
   const shouldScrollRef = useRef(true);
   const prevMessagesLenRef = useRef(0);
@@ -609,6 +616,15 @@ const Messages = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [imageModal.open]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      if (mobileView !== "split") setMobileView("split");
+      return;
+    }
+    const nextView = activeConv ? "chat" : "list";
+    if (mobileView !== nextView) setMobileView(nextView);
+  }, [isMobile, activeConv, mobileView]);
 
   useEffect(() => {
     const handleThemeChange = () => {
@@ -963,7 +979,8 @@ const Messages = () => {
   /* ────────── Select conversation ────────── */
   const handleSelectConv = useCallback((conv) => {
     setActiveConv(conv);
-  }, []);
+    if (isMobile) setMobileView("chat");
+  }, [isMobile]);
 
   /* ────────── Select user from search → open DM (do NOT create DB conv yet) ────────── */
   const handleSelectUser = useCallback(async (user) => {
@@ -1054,11 +1071,30 @@ const Messages = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, [headerMenuOpen]);
 
+  useEffect(() => {
+    if (!showAttachMenu) return;
+    const handler = (e) => {
+      const t = e.target;
+      if (attachMenuRef.current && attachMenuRef.current.contains(t)) return;
+      if (attachButtonRef.current && attachButtonRef.current.contains(t)) return;
+      setShowAttachMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showAttachMenu]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setShowAttachMenu(false);
+    }
+  }, [isMobile]);
+
   /* ────────── File upload ────────── */
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = ""; // reset input
+    setShowAttachMenu(false);
 
     const MAX = 10 * 1024 * 1024;
     if (file.size > MAX) {
@@ -1098,6 +1134,7 @@ const Messages = () => {
   const handleSend = useCallback(() => {
     if (!activeConv) return;
     if (!inputText.trim() && !attachmentPending) return;
+    setShowAttachMenu(false);
 
     const attachments = attachmentPending
       ? [
@@ -1302,8 +1339,11 @@ const Messages = () => {
     } catch (e) { }
   }, [conversations, location.key, location.state, refetchConvs, queryClient, navigate]);
 
+  const showList = !isMobile || mobileView !== "chat";
+  const showChat = !isMobile || mobileView !== "list";
+
   return (
-    <div className="msg-page">
+    <div className={`msg-page ${isMobile ? "msg-page-mobile" : ""}`}>
       {notification.open && (
         <MessageBox message={notification.message} type={notification.type} closing={notification.closing} />
       )}
@@ -1314,6 +1354,7 @@ const Messages = () => {
         </div>
       )}
       {/* ═══════════ LEFT PANEL ═══════════ */}
+      {showList && (
       <div className="msg-left-panel">
         <div className="msg-panel-header">
           <h2>{isAdmin ? "User Reports" : "Messages"}</h2>
@@ -1430,8 +1471,10 @@ const Messages = () => {
           </>
         )}
       </div>
+      )}
 
       {/* ═══════════ RIGHT PANEL ═══════════ */}
+      {showChat && (
       <div className="msg-right-panel">
         {!activeConv ? (
             <div className="msg-empty-state">
@@ -1596,6 +1639,14 @@ const Messages = () => {
                 accept=".jpg,.jpeg,.png,.webp,.mp3,.pdf,.doc,.docx,.zip"
                 onChange={handleFileChange}
               />
+              <input
+                type="file"
+                ref={cameraInputRef}
+                style={{ display: "none" }}
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+              />
               <div className="msg-input-compose">
                 {showEmojiPicker && (
                   <div className="msg-emoji-popover" ref={emojiPickerRef}>
@@ -1638,12 +1689,45 @@ const Messages = () => {
                   className="msg-attach-btn"
                   title="Attach file"
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  ref={attachButtonRef}
+                  onClick={() => {
+                    if (isMobile) {
+                      setShowAttachMenu((prev) => !prev);
+                    } else {
+                      fileInputRef.current?.click();
+                    }
+                  }}
                   disabled={uploading}
                 >
                   <AttachIcon />
                 </button>
               </div>
+              {isMobile && showAttachMenu && (
+                <div className="msg-attach-sheet" ref={attachMenuRef}>
+                  <button
+                    type="button"
+                    className="msg-attach-option"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      cameraInputRef.current?.click();
+                    }}
+                  >
+                    <CameraIcon />
+                    <span>Camera</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="msg-attach-option"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <AttachIcon />
+                    <span>Files</span>
+                  </button>
+                </div>
+              )}
               </div>
               <button
                 className="msg-send-btn"
@@ -1657,6 +1741,7 @@ const Messages = () => {
           </>
         )}
       </div>
+      )}
     </div>
   );
 };
@@ -1756,6 +1841,12 @@ const EmojiIcon = () => (
 const AttachIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
     <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
+  </svg>
+);
+
+const CameraIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+    <path d="M9 4l1.5-2h3L15 4h3c1.1 0 2 .9 2 2v11c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h3zm3 13a4 4 0 100-8 4 4 0 000 8zm0-1.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
   </svg>
 );
 

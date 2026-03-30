@@ -43,6 +43,7 @@
   --chart-text: #475569;
   --tooltip-bg: #fff;
   --tooltip-text: #111827;
+  --mobile-nav-height: 72px;
 }
 
 html.dark {
@@ -734,4 +735,25 @@ html.dark .admin-summary-card:hover,
 html.dark .stat-card:hover,
 html.dark .opps-card:hover {
   box-shadow: var(--shadow-strong);
+}
+
+@media (max-width: 768px) {
+  .page,
+  .opportunities-page,
+  .impact-page,
+  .profile-page,
+  .settings-page,
+  .help-support-page,
+  .admin-dashboard-page,
+  .admin-logs-page {
+    padding: 16px 16px 96px;
+    max-height: none;
+    box-sizing: border-box;
+  }
+
+  .msg-page {
+    height: auto;
+    min-height: calc(100vh - 120px);
+    padding-bottom: 0;
+  }
 }

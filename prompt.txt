@@ -974,3 +974,128 @@ on click a question dropdown a window from that question and explain flow of the
 
 2.in pdf generation add title with icon(use recycle_icon.svg), and whenever send email both for otp and plain email.add icon beside the title.
 3.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+lost 
+
+
+
+
+
+
+
+For the whole system we doesn't develop small screen ui(media queries). 
+Note : don't break desktop ui.i want no change in desktop ui.
+For Mobile screens: 
+
+Remove side navbar .add bottom navbar with five navlinks with icons (opportunities , pickup and schedule, dashboard, messages, profile if user is volunteer /NGO) .
+for user is admin bottom navbar should be this order:
+opportunites, schedule & pickup , dashboard, reports, adminlogs.
+remaing add to side window  at bottom. 
+Make sure follow this order . by default open dashboard.
+I want professional navbar on clicking another navlinks the animation should be good and smooth.
+
+Place topbar component top only just like present we have and add menu icon on left for topbar for only mobile screens.
+Onclick open a side window from left with a sliding Animation(ease in out 1sec ) with back button onclick close that window(ease in out 1sec ) .
+
+In that window at bottom add remaining navlinks.
+
+At top add title(wastezero )with icon & user name with role just like navbar have in desktop screens.
+
+Below the username name of the page view right now and custom links are add based on page is viewing.
+
+Dashboard page : 
+
+Develop this page for small screen including application overlayed window and 
+For volunteers & NGO's we have a toggle buttons is there opportunities & my applications/my opportunities.
+Remove that toggle add to custom link to side window and highlight which is viewing in the screen.so here toggle buttons replace with custom links in side window.
+
+Opportunities page : 
+
+Develop this page for small screen including full details container.
+
+Message page : 
+For this page also develop small screen.
+Expected messages page ui for small screens: 
+Show list of users container first . on click a chat close list of users container open that user chat with back button(left Arrow ) place on left of the chat username .so user get back to message chat list on clicking back button .
+Make sure  no  both users list, chat opened at a time. it is layered for small screen.
+
+My impact page : 
+Develop small screen for this page . Remove toggle buttons and add to custom links to side window.
+For small screen make sure graph and pie chart visible clearly with good alignment.
+
+my profile page : remove toggle button and add to custom link to side window .and develop ui for small screens.
+
+develop small screen ui for settings and help & suppport page also.
+
+
+
+
+
+
+
+
+

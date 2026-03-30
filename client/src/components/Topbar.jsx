@@ -24,6 +24,7 @@ import {
   syncThemeWithStorage,
   syncThemeWithSystemPreference,
 } from "../Services/theme";
+import useIsMobile from "../Services/useIsMobile";
 import "../styles/Topbar.css";
 import MessageBox from "./MessageBox";
 import Loading from "./Loading";
@@ -51,7 +52,7 @@ const getStructuredMessageSubject = (content = "") => {
   return MESSAGE_SUBJECTS.has(firstLine) ? firstLine : "";
 };
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }) {
   const { data: me } = useMe();
   const queryClient = useQueryClient();
   const isAdmin = me?.role === "admin";
@@ -65,6 +66,7 @@ export default function Topbar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [theme, setTheme] = useState(() => resolveThemePreference());
   const { data: notifications = [] } = useNotifications();
+  const isMobile = useIsMobile();
 
   // Search window state
   const [searchInput, setSearchInput] = useState("");
@@ -79,6 +81,21 @@ export default function Topbar() {
   const notificationSoundUnlockedRef = useRef(false);
   const isDarkMode = theme === DARK_THEME;
   const unread = useMemo(() => getUnreadNotificationCount(notifications), [notifications]);
+  const toggleNotifications = () => {
+    setShowNotifications((s) => {
+      const next = !s;
+      if (next) setOpen(false);
+      return next;
+    });
+  };
+
+  const toggleUserMenu = () => {
+    setOpen((s) => {
+      const next = !s;
+      if (next) setShowNotifications(false);
+      return next;
+    });
+  };
 
   const showMessage = (msg, type = "info", duration = 3000) => {
     setNotification({ open: true, message: msg, type, closing: false });
@@ -872,6 +889,17 @@ export default function Topbar() {
   return (
     <div className="topbar">
       <div className="topbar-left">
+        {isMobile && (
+          <button
+            className="topbar-menu-btn"
+            aria-label="Open navigation"
+            onClick={() => onMenuClick && onMenuClick()}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        )}
         <div className="topbar-search-wrapper">
           <img src={searchIcon} alt="Search" className="search-icon" />
           <input
@@ -1014,7 +1042,7 @@ export default function Topbar() {
 
       <div className="topbar-right" ref={menuRef}>
         <div className="icon-btn" aria-label="notifications" style={{ position: 'relative' }}>
-          <div onClick={() => { setShowNotifications((s) => !s); }} style={{ cursor: 'pointer' }}>
+          <div onClick={toggleNotifications} style={{ cursor: 'pointer' }}>
             <NotificationBell />
             {unread > 0 && (
               <div style={{ position: 'absolute', right: 0, top: -4, background: 'var(--danger)', color: 'var(--text-inverse)', borderRadius: '10px', padding: '2px 6px', fontSize: 12, boxShadow: 'var(--shadow-soft)' }}>
@@ -1024,12 +1052,28 @@ export default function Topbar() {
           </div>
 
           {showNotifications && (
-            <div style={{ position: 'absolute', right: 0, top: 44, width: 360, maxHeight: 420, overflow: 'auto', background: 'var(--surface-primary)', boxShadow: 'var(--shadow-strong)', border: '1px solid var(--border-color)', borderRadius: 8, zIndex: 60 }}>
-              <NotificationPanel />
+            <div className="notification-popover">
+              <div className="notification-popover__header">
+                <div>
+                  <div className="notification-popover__title">Notifications</div>
+                  <div className="notification-popover__meta">{unread} unread</div>
+                </div>
+                <button
+                  type="button"
+                  className="notification-popover__close"
+                  aria-label="Close notifications"
+                  onClick={() => setShowNotifications(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="notification-popover__body">
+                <NotificationPanel />
+              </div>
             </div>
           )}
         </div>
-        <div className="user-circle" title={me?.fullName || "Guest"} onClick={() => setOpen(!open)}>{initial}</div>
+        <div className="user-circle" title={me?.fullName || "Guest"} onClick={toggleUserMenu}>{initial}</div>
 
         {open && (
           <div className="topbar-menu">

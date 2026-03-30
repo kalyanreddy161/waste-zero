@@ -11,6 +11,7 @@ import AdminDashboard from "./AdminDashboard";
 import completeIcon from "../assets/icons/complete.svg";
 import pickupIcon from "../assets/icons/pickup.svg";
 import co2Icon from "../assets/icons/co2saved.svg";
+import useIsMobile from "../Services/useIsMobile";
 
 const StandardDashboard = ({ me }) => {
   const [previewOpps, setPreviewOpps] = useState([]);
@@ -20,6 +21,7 @@ const StandardDashboard = ({ me }) => {
   const queryClient = useQueryClient();
   const statHintTimerRef = useRef(null);
   const [visibleStatHint, setVisibleStatHint] = useState("");
+  const isMobile = useIsMobile();
 
   // Calculate active opportunities count (status: "open" or "in-progress")
   const [activeOpportunitiesCount, setActiveOpportunitiesCount] = useState(0);
@@ -204,6 +206,22 @@ const StandardDashboard = ({ me }) => {
     }
   }, [activeTab, me?.role, refetchApplications]);
 
+  useEffect(() => {
+    if (!isMobile) return;
+    const handler = (ev) => {
+      const detail = ev?.detail || {};
+      if (detail.page !== "dashboard") return;
+      setActiveTab(detail.key === "mine" ? "mine" : "opportunities");
+    };
+    window.addEventListener("mobile:custom-link", handler);
+    return () => window.removeEventListener("mobile:custom-link", handler);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    window.dispatchEvent(new CustomEvent("mobile:custom-state", { detail: { page: "dashboard", key: activeTab } }));
+  }, [activeTab, isMobile]);
+
   const normalizeOpportunity = (opp) => {
     if (!opp) return opp;
     const copy = { ...opp };
@@ -338,7 +356,7 @@ const StandardDashboard = ({ me }) => {
       </div>
 
       {/* Toggle switch */}
-      {me && (
+      {me && !isMobile && (
         <label htmlFor="filter-toggle" className="switch dashboard-toggle" aria-label="Toggle Filter">
           <input
             type="checkbox"

@@ -1,7 +1,21 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 
 const PageNotFound = () => {
+  const [isDark, setIsDark] = useState(() =>
+    typeof document !== "undefined"
+      ? document.documentElement.classList.contains("dark")
+      : false
+  );
+
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
+    window.addEventListener("themechange", handleThemeChange);
+    return () => window.removeEventListener("themechange", handleThemeChange);
+  }, []);
+
   return (
     <StyledWrapper>
       <div className="page-not-found-container">
@@ -9,7 +23,7 @@ const PageNotFound = () => {
           <lord-icon
             src="https://cdn.lordicon.com/zruuduya.json"
             trigger="hover"
-            colors="primary:#121331,secondary:#08C18A"
+            colors={`primary:${isDark ? "#e5e7eb" : "#121331"},secondary:${isDark ? "#22C55E" : "#08C18A"}`}
             style={{ width: "56px", height: "56px" }}
           ></lord-icon>
           <span className="page-not-found-brand-text">WasteZero</span>
@@ -459,6 +473,21 @@ const StyledWrapper = styled.div`
       transform: translateX(-200px);
       opacity: 0;
     }
+  }
+
+  html.dark & .card {
+    --bg-gradient: #0f172a;
+    box-shadow:
+      0 18px 38px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  html.dark & .card .error-code {
+    color: rgba(255, 255, 255, 0.08);
+  }
+
+  html.dark & .page-not-found-brand-text {
+    color: var(--text-primary);
   }
 `;
 

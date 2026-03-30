@@ -349,11 +349,14 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     z-index: 5;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
 }
 
 /* conversation header menu (three-dots) */
 .msg-conv-header {
-    position: relative;
+    position: sticky;
+    top: 0;
 }
 
 .msg-conv-menu {
@@ -1155,6 +1158,45 @@
     box-shadow: 0 6px 18px rgba(8, 193, 138, 0.5);
 }
 
+.msg-attach-sheet {
+    position: absolute;
+    right: 6px;
+    bottom: calc(100% + 8px);
+    background: var(--surface-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-medium);
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    min-width: 180px;
+    z-index: 10;
+}
+
+.msg-attach-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.msg-attach-option:hover {
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+}
+
+.msg-attach-option svg {
+    width: 18px;
+    height: 18px;
+}
+
 /* ===== ANIMATIONS ===== */
 .msg-fade-in {
     animation: fadeSlideIn 200ms ease;
@@ -1402,4 +1444,65 @@ html.dark .msg-image-modal-back {
 
 html.dark .msg-image-modal-image {
     box-shadow: var(--shadow-strong);
+}
+
+.msg-mobile-back {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-secondary);
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .msg-page {
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - var(--mobile-nav-height) - 70px);
+        background: var(--page-bg);
+        padding-bottom: 0;
+    }
+
+    .msg-left-panel,
+    .msg-right-panel {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .msg-left-panel {
+        border-right: none;
+        min-height: 320px;
+    }
+
+    .msg-right-panel {
+        flex: 1;
+        min-height: 320px;
+        overflow: visible;
+        padding-bottom: var(--mobile-nav-height);
+    }
+
+    .msg-conv-header {
+        gap: 12px;
+    }
+
+    .msg-mobile-back {
+        display: inline-flex;
+    }
+
+    .msg-messages-area {
+        padding-bottom: 12px;
+    }
+
+    .msg-input-bar {
+        position: sticky;
+        bottom: var(--mobile-nav-height);
+        border-radius: 18px 18px 0 0;
+        box-shadow: 0 -10px 26px rgba(15, 23, 42, 0.12);
+        background: var(--surface-primary);
+    }
 }

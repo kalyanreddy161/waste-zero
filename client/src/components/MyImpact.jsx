@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { useMe, API_BASE } from "../Services/useMe";
 import Loading from "./Loading";
 import "../styles/NavbarComponents-styles/MyImpact.css";
+import useIsMobile from "../Services/useIsMobile";
 
 // 1. Reusable Observer Hook
 function useInView(options = { threshold: 0.4 }) {
@@ -20,8 +21,12 @@ function useInView(options = { threshold: 0.4 }) {
       }
     }, options);
 
+    const fallback = window.setTimeout(() => setIsVisible(true), 600);
     observer.observe(ref.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(fallback);
+    };
   }, [options.threshold]);
 
   return [ref, isVisible];
@@ -67,6 +72,7 @@ export default function MyImpact() {
   const role = me?.role || "volunteer";
   const location = useLocation();
   const handledScrollTargetRef = useRef("");
+  const isMobile = useIsMobile();
 
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
@@ -183,6 +189,28 @@ export default function MyImpact() {
       scrollToRef(nextTarget.ref, nextTarget.tab);
     }, 180);
   }, [location.hash, location.key, location.state, oppRef, pickupRef, co2Ref, isLoading]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const handler = (ev) => {
+      const detail = ev?.detail || {};
+      if (detail.page !== "impact") return;
+      if (detail.key === "pickup") {
+        scrollToRef(pickupRef, "pickup");
+      } else if (detail.key === "co2") {
+        scrollToRef(co2Ref, "co2");
+      } else {
+        scrollToRef(oppRef, "opportunities");
+      }
+    };
+    window.addEventListener("mobile:custom-link", handler);
+    return () => window.removeEventListener("mobile:custom-link", handler);
+  }, [isMobile, oppRef, pickupRef, co2Ref]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    window.dispatchEvent(new CustomEvent("mobile:custom-state", { detail: { page: "impact", key: activeTab } }));
+  }, [activeTab, isMobile]);
 
   const oppData = useMemo(() => {
     const data = MONTHS.map(m => ({ month: m, total: 0, specific: 0 }));
@@ -321,26 +349,28 @@ export default function MyImpact() {
         <p style={{ fontWeight: 400, fontSize: "16px", color: "var(--text-muted)", margin: "8px 0 0" }}>A complete overview of your environmental footprint</p>
       </div>
 
-      <div className="impact-header">
-        <button
-          className={`impact-toggle-btn ${activeTab === 'opportunities' ? 'active' : ''}`}
-          onClick={() => scrollToRef(oppRef, 'opportunities')}
-        >
-          Opportunities
-        </button>
-        <button
-          className={`impact-toggle-btn ${activeTab === 'pickup' ? 'active' : ''}`}
-          onClick={() => scrollToRef(pickupRef, 'pickup')}
-        >
-          Pickup
-        </button>
-        <button
-          className={`impact-toggle-btn ${activeTab === 'co2' ? 'active' : ''}`}
-          onClick={() => scrollToRef(co2Ref, 'co2')}
-        >
-          CO₂ Saved
-        </button>
-      </div>
+      {!isMobile && (
+        <div className="impact-header">
+          <button
+            className={`impact-toggle-btn ${activeTab === 'opportunities' ? 'active' : ''}`}
+            onClick={() => scrollToRef(oppRef, 'opportunities')}
+          >
+            Opportunities
+          </button>
+          <button
+            className={`impact-toggle-btn ${activeTab === 'pickup' ? 'active' : ''}`}
+            onClick={() => scrollToRef(pickupRef, 'pickup')}
+          >
+            Pickup
+          </button>
+          <button
+            className={`impact-toggle-btn ${activeTab === 'co2' ? 'active' : ''}`}
+            onClick={() => scrollToRef(co2Ref, 'co2')}
+          >
+            CO₂ Saved
+          </button>
+        </div>
+      )}
 
       <div style={{ padding: '0 8px' }}>
         {/* Graph 1: Opportunities */}

@@ -160,11 +160,13 @@ export default function ConfirmDialog({
             style={{
               padding: "18px 20px",
               borderRadius: "20px",
-              border: "1px solid var(--border-color)",
-              background: "var(--surface-primary)",
-              color: "var(--text-secondary)",
+              border: "1px dashed var(--primary)",
+              background: "linear-gradient(135deg, rgba(8, 193, 138, 0.08), rgba(8, 193, 138, 0.16))",
+              color: "var(--text-primary)",
               lineHeight: 1.75,
               fontSize: "15px",
+              boxShadow: "0 10px 26px rgba(8, 193, 138, 0.18)",
+              fontWeight: 600,
             }}
           >
             {message}

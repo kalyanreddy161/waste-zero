@@ -192,3 +192,9 @@
 .nav-link.logout .nav-icon {
   filter: invert(17%) sepia(94%) saturate(3184%) hue-rotate(345deg) brightness(90%) contrast(101%);
 }
+
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+}

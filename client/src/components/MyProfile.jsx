@@ -6,11 +6,13 @@ import MapPicker from "./MapPicker";
 import ActionButton from "./ActionButton";
 import "../styles/NavbarComponents-styles/MyProfile.css";
 import { useMe, API_BASE } from "../Services/useMe";
+import useIsMobile from "../Services/useIsMobile";
 
 const MyProfile = () => {
   const [active, setActive] = useState("profile");
   const [toggleChecked, setToggleChecked] = useState(false);
   const [editing, setEditing] = useState(false);
+  const isMobile = useIsMobile();
 
   const [fullName, setFullName] = useState("");
   const [skills, setSkills] = useState("");
@@ -65,6 +67,22 @@ const MyProfile = () => {
   useEffect(() => {
     setToggleChecked(active === "password");
   }, [active]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const handler = (ev) => {
+      const detail = ev?.detail || {};
+      if (detail.page !== "profile") return;
+      setActive(detail.key === "password" ? "password" : "profile");
+    };
+    window.addEventListener("mobile:custom-link", handler);
+    return () => window.removeEventListener("mobile:custom-link", handler);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    window.dispatchEvent(new CustomEvent("mobile:custom-state", { detail: { page: "profile", key: active } }));
+  }, [active, isMobile]);
 
   const handleToggleChange = (e) => {
     const checked = e.target.checked;
@@ -360,16 +378,18 @@ const MyProfile = () => {
             </p>
           </div>
 
-          <label htmlFor="profile-password-toggle" className="switch" aria-label="Toggle Profile/Password">
-            <input
-              type="checkbox"
-              id="profile-password-toggle"
-              checked={toggleChecked}
-              onChange={handleToggleChange}
-            />
-            <span>Profile</span>
-            <span>Password</span>
-          </label>
+          {!isMobile && (
+            <label htmlFor="profile-password-toggle" className="switch" aria-label="Toggle Profile/Password">
+              <input
+                type="checkbox"
+                id="profile-password-toggle"
+                checked={toggleChecked}
+                onChange={handleToggleChange}
+              />
+              <span>Profile</span>
+              <span>Password</span>
+            </label>
+          )}
         </div>
 
         <div className="profile-main-grid">
