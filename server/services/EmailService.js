@@ -9,25 +9,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const RECYCLE_ICON_CID = "wastezero-recycle-icon";
-const RECYCLE_ICON_PATH = path.join(
-  __dirname,
-  "..",
-  "..",
-  "client",
-  "public",
-  "recycle_icon.svg"
-);
-
-const BRAND_ATTACHMENTS = [
-  {
-    filename: "recycle_icon.svg",
-    path: RECYCLE_ICON_PATH,
-    cid: RECYCLE_ICON_CID,
-    contentType: "image/svg+xml",
-  },
-];
-
 const escapeHtml = (value) =>
   String(value || "")
     .replace(/&/g, "&amp;")
@@ -39,16 +20,21 @@ const escapeHtml = (value) =>
 const buildEmailShell = ({ title, contentHtml, footerText }) => `
   <div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
     <div style="max-width: 560px; margin: auto; background-color: #ffffff; padding: 24px; border-radius: 12px;">
-      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
-        <img src="cid:${RECYCLE_ICON_CID}" alt="WasteZero" width="32" height="32" style="display: block;" />
-        <div>
-          <div style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800;">WasteZero</div>
-          <div style="margin-top: 2px; color: #334155; font-size: 14px; font-weight: 600;">${escapeHtml(title)}</div>
+      
+      <!-- Header without icon -->
+      <div style="margin-bottom: 18px;">
+        <div style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800;">WasteZero</div>
+        <div style="margin-top: 2px; color: #334155; font-size: 14px; font-weight: 600;">
+          ${escapeHtml(title)}
         </div>
       </div>
+
       ${contentHtml}
+
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px;" />
-      <p style="color: #9ca3af; font-size: 12px; margin: 0;">${escapeHtml(footerText)}</p>
+      <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+        ${escapeHtml(footerText)}
+      </p>
     </div>
   </div>
 `;
@@ -82,7 +68,6 @@ async function sendVerificationEmail(userEmail) {
       `,
       footerText: "If you did not request this, you can safely ignore this email.",
     }),
-    attachments: BRAND_ATTACHMENTS,
   });
 
   console.log(`Verification code ${verificationCode} sent to ${userEmail}`);
@@ -116,7 +101,6 @@ async function sendPlainEmail({ to, subject, text }) {
     subject,
     text,
     html: buildEmailHtml(subject, text),
-    attachments: BRAND_ATTACHMENTS,
   });
 }
 

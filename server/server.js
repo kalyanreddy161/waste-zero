@@ -22,6 +22,7 @@ const User = require("./models/User");
 const { runModerationExpirySweep } = require("./services/moderationStatusService");
 
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 const MODERATION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 /* ======================
@@ -29,6 +30,8 @@ const MODERATION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 ====================== */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// allow secure cookies behind proxies/load balancers
+app.set("trust proxy", 1);
 
 app.use(
   cors({
@@ -67,8 +70,9 @@ const sessionMiddleware = session({
   store: store,
   cookie: {
     httpOnly: true,
-    secure: false,
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    domain: process.env.COOKIE_DOMAIN || undefined,
     maxAge: process.env.SESSION_MAX_AGE
       ? parseInt(process.env.SESSION_MAX_AGE, 10)
       : 7 * 24 * 60 * 60 * 1000,
