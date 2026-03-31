@@ -63,16 +63,16 @@ store.on("error", (error) => {
 /* ======================
    SESSION MIDDLEWARE
 ====================== */
+app.set("trust proxy", 1); 
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "secret123",
   resave: false,
   saveUninitialized: false,
   store: store,
-  cookie: {
+    cookie: {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    domain: process.env.COOKIE_DOMAIN || undefined,
+    secure: true ,          // ✅ only true in production
+    sameSite: "none",  // ✅ important
     maxAge: process.env.SESSION_MAX_AGE
       ? parseInt(process.env.SESSION_MAX_AGE, 10)
       : 7 * 24 * 60 * 60 * 1000,
@@ -103,7 +103,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["https://waste-zero-sigma.vercel.app","http://localhost:5173", "http://localhost:5174"],
     credentials: true,
   },
 });

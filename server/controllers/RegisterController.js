@@ -49,7 +49,7 @@ exports.sendOTP = async (req, res) => {
     let user = await User.findOne({ email: userEmail });
 
     // generate OTP and expiry AFTER locating the user
-    const otp = await sendVerificationEmail(userEmail);
+    const { otp } = await sendVerificationEmail(userEmail);
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     if (!user) {
@@ -206,7 +206,7 @@ exports.sendForgotPasswordOTP = async (req, res) => {
       return res.status(404).json({ message: "No account found with this email" });
     }
 
-    const otp = await sendVerificationEmail(userEmail);
+    const { otp } = await sendVerificationEmail(userEmail);
     user.otp = otp;
     user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
