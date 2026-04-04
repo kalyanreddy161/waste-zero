@@ -35,7 +35,7 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: ["https://waste-zero-sigma.vercel.app", "http://localhost:5173", "http://localhost:5174"],
+    origin: ["https://waste-zero-sigma.vercel.app","https://www.wastezero.me" ,"http://localhost:5173", "http://localhost:5174"],
     credentials: true,
   })
 );
